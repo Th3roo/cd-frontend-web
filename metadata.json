@@ -1,0 +1,5 @@
+{
+  "name": "Cognitive Dungeon",
+  "description": "Текстовая RPG/Roguelike с гибридным управлением, процедурной генерацией и ИИ-нарративом.",
+  "requestFramePermissions": []
+}
