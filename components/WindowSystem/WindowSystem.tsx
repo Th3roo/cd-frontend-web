@@ -99,7 +99,7 @@ const WindowSystem: FC<WindowSystemProps> = ({
         decorated: false,
         lockHeight: true,
         defaultPosition: { x: 450, y: 10 },
-        defaultSize: { width: window.innerWidth - 900, height: 50 },
+        defaultSize: { width: window.innerWidth - 900, height: 60 },
         content: (
           <TurnOrderBar
             entities={entities}
