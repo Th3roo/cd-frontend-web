@@ -25,6 +25,7 @@ import {
   LogType,
   Position,
 } from "./types";
+import { findPath } from "./utils/pathfinding";
 
 const MIN_ZOOM = 0.5;
 const MAX_ZOOM = 3;
@@ -61,6 +62,16 @@ const App: React.FC = () => {
   const containerRef = useRef<HTMLDivElement>(null);
   const [playerPosKey, setPlayerPosKey] = useState<string>("");
   const followInitializedRef = useRef(false);
+
+  // Pathfinding state
+  const [pathfindingTarget, setPathfindingTarget] = useState<Position | null>(
+    null,
+  );
+  const [currentPath, setCurrentPath] = useState<Position[]>([]);
+  const [isPathfinding, setIsPathfinding] = useState(false);
+  const [waitingForMoveResponse, setWaitingForMoveResponse] = useState(false);
+  const pathfindingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const lastCommandedPosRef = useRef<Position | null>(null);
 
   // Единый регистр всех сущностей (включая игрока)
   const entityRegistry = useMemo(() => {
@@ -363,11 +374,170 @@ const App: React.FC = () => {
     [entityRegistry, world, zoom],
   );
 
+  const handleGoToPathfinding = useCallback(
+    (targetPos: Position) => {
+      if (!player || !world) return;
+
+      // Stop any existing pathfinding
+      if (pathfindingTimeoutRef.current) {
+        clearTimeout(pathfindingTimeoutRef.current);
+        pathfindingTimeoutRef.current = null;
+      }
+
+      // Find path
+      const path = findPath(player.pos, targetPos, world);
+
+      if (!path || path.length === 0) {
+        addLog(
+          `Не удалось найти путь к <span class="cursor-pointer text-orange-400 hover:underline" data-position-x="${targetPos.x}" data-position-y="${targetPos.y}">(${targetPos.x}, ${targetPos.y})</span>`,
+          LogType.ERROR,
+          undefined,
+          targetPos,
+        );
+        return;
+      }
+
+      // Set pathfinding state
+      setPathfindingTarget(targetPos);
+      setCurrentPath([player.pos, ...path]);
+      setIsPathfinding(true);
+      setSelectedTargetPosition(targetPos);
+
+      addLog(
+        `Начинаем движение к (${targetPos.x}, ${targetPos.y}), длина пути: ${path.length}`,
+        LogType.INFO,
+      );
+    },
+    [player, world],
+  );
+
   const handleFollowEntity = useCallback((entityId: string | null) => {
     setFollowedEntityId(entityId);
     if (entityId) {
       console.log("Следим за сущностью:", entityId);
     }
+  }, []);
+
+  // Pathfinding execution loop - send next move command
+  useEffect(() => {
+    if (!isPathfinding || currentPath.length <= 1 || !player || !world) {
+      return;
+    }
+
+    // Don't send next command if we're waiting for response
+    if (waitingForMoveResponse) {
+      return;
+    }
+
+    const currentPlayerPos = player.pos;
+    const nextStep = currentPath[1]; // Index 0 is current position
+
+    // Calculate movement delta
+    const dx = nextStep.x - currentPlayerPos.x;
+    const dy = nextStep.y - currentPlayerPos.y;
+
+    // Send move command
+    sendCommand("MOVE", { dx, dy }, `пошли на (${nextStep.x}, ${nextStep.y})`);
+
+    // Mark that we're waiting for server response
+    setWaitingForMoveResponse(true);
+    lastCommandedPosRef.current = nextStep;
+
+    // TODO: В будущем будем ждать нашего хода (turn-based система). ПОКА НЕ РЕАЛИЗОВАНО
+    // Set timeout as fallback in case server doesn't respond
+    pathfindingTimeoutRef.current = setTimeout(() => {
+      addLog(`Таймаут ожидания ответа сервера. Остановка пути.`, LogType.ERROR);
+      setIsPathfinding(false);
+      setCurrentPath([]);
+      setPathfindingTarget(null);
+      setWaitingForMoveResponse(false);
+      lastCommandedPosRef.current = null;
+    }, 2000); // 2 second timeout
+  }, [
+    isPathfinding,
+    currentPath,
+    waitingForMoveResponse,
+    player?.pos.x,
+    player?.pos.y,
+    world,
+    sendCommand,
+  ]);
+
+  // Check server response - did player move to expected position?
+  useEffect(() => {
+    if (!waitingForMoveResponse || !lastCommandedPosRef.current || !player) {
+      return;
+    }
+
+    const commandedPos = lastCommandedPosRef.current;
+    const currentPos = player.pos;
+
+    // Check if player moved to the commanded position
+    if (currentPos.x === commandedPos.x && currentPos.y === commandedPos.y) {
+      // Success! Player moved to expected position
+      // Clear timeout
+      if (pathfindingTimeoutRef.current) {
+        clearTimeout(pathfindingTimeoutRef.current);
+        pathfindingTimeoutRef.current = null;
+      }
+
+      // Remove completed step from path
+      setCurrentPath((prev) => prev.slice(1));
+      setWaitingForMoveResponse(false);
+      lastCommandedPosRef.current = null;
+    } else {
+      // Check if player position changed but not to expected position
+      // This means server blocked the move
+      const prevPos = currentPath[0];
+      if (
+        prevPos &&
+        (currentPos.x !== prevPos.x || currentPos.y !== prevPos.y)
+      ) {
+        // Position changed but not to where we expected - server moved us elsewhere
+        addLog(
+          `Сервер переместил на неожиданную позицию (${currentPos.x}, ${currentPos.y}). Остановка пути.`,
+          LogType.ERROR,
+        );
+        if (pathfindingTimeoutRef.current) {
+          clearTimeout(pathfindingTimeoutRef.current);
+          pathfindingTimeoutRef.current = null;
+        }
+        setIsPathfinding(false);
+        setCurrentPath([]);
+        setPathfindingTarget(null);
+        setWaitingForMoveResponse(false);
+        lastCommandedPosRef.current = null;
+      }
+    }
+  }, [player?.pos.x, player?.pos.y, waitingForMoveResponse, currentPath]);
+
+  // Stop pathfinding when reached target
+  useEffect(() => {
+    if (!isPathfinding || !player || !pathfindingTarget) return;
+
+    if (
+      player.pos.x === pathfindingTarget.x &&
+      player.pos.y === pathfindingTarget.y
+    ) {
+      addLog(
+        `Достигли цели (${pathfindingTarget.x}, ${pathfindingTarget.y})`,
+        LogType.SUCCESS,
+      );
+      setIsPathfinding(false);
+      setCurrentPath([]);
+      setPathfindingTarget(null);
+    }
+  }, [player?.pos.x, player?.pos.y, isPathfinding, pathfindingTarget]);
+
+  // Cleanup pathfinding timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (pathfindingTimeoutRef.current) {
+        clearTimeout(pathfindingTimeoutRef.current);
+      }
+      setWaitingForMoveResponse(false);
+      lastCommandedPosRef.current = null;
+    };
   }, []);
 
   // --- UI Handlers ---
@@ -699,8 +869,11 @@ const App: React.FC = () => {
                 onSelectPosition={handleSelectPosition}
                 onFollowEntity={handleFollowEntity}
                 onSendCommand={sendCommand}
+                onGoToPathfinding={handleGoToPathfinding}
                 selectedTargetEntityId={selectedTargetEntityId}
                 selectedTargetPosition={selectedTargetPosition}
+                pathfindingTarget={pathfindingTarget}
+                currentPath={currentPath}
               />
             </div>
           </div>

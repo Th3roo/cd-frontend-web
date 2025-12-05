@@ -9,6 +9,7 @@ import {
   DollarSign,
   Zap,
   Sparkles,
+  Navigation,
 } from "lucide-react";
 
 import { SYMBOLS, COLORS } from "../constants";
@@ -28,8 +29,11 @@ interface GameGridProps {
   onSelectPosition?: (x: number, y: number) => void;
   onFollowEntity?: (entityId: string | null) => void;
   onSendCommand?: (action: string, payload?: any) => void;
+  onGoToPathfinding?: (position: Position) => void;
   selectedTargetEntityId?: string | null;
   selectedTargetPosition?: Position | null;
+  pathfindingTarget?: Position | null;
+  currentPath?: Position[];
 }
 
 interface ContextMenu {
@@ -51,8 +55,11 @@ const GameGrid: FC<GameGridProps> = ({
   onSelectPosition,
   onFollowEntity,
   onSendCommand,
+  onGoToPathfinding,
   selectedTargetEntityId,
   selectedTargetPosition,
+  pathfindingTarget,
+  currentPath = [],
 }) => {
   const [contextMenu, setContextMenu] = useState<ContextMenu | null>(null);
   const [isDragging, setIsDragging] = useState(false);
@@ -286,6 +293,9 @@ const GameGrid: FC<GameGridProps> = ({
 
     const isSelectedPosition =
       selectedTargetPosition?.x === x && selectedTargetPosition?.y === y;
+    const isPathfindingTarget =
+      pathfindingTarget?.x === x && pathfindingTarget?.y === y;
+    const isOnPath = currentPath.some((pos) => pos.x === x && pos.y === y);
 
     let bgClass = "bg-neutral-900";
     let floorSymbol = SYMBOLS.FLOOR;
@@ -349,6 +359,22 @@ const GameGrid: FC<GameGridProps> = ({
               inset: `${-Math.max(2, zoom * 2)}px`,
             }}
           />
+        )}
+
+        {/* Выделение цели pathfinding */}
+        {isPathfindingTarget && (
+          <div
+            className="absolute rounded-lg pointer-events-none z-20 border-green-500 animate-pulse"
+            style={{
+              borderWidth: `${Math.max(2, zoom * 3)}px`,
+              inset: `${-Math.max(3, zoom * 3)}px`,
+            }}
+          />
+        )}
+
+        {/* Подсветка пути */}
+        {isOnPath && !isPathfindingTarget && (
+          <div className="absolute inset-0 bg-green-400/20 pointer-events-none z-10" />
         )}
 
         {/* Фон/пол клетки */}
@@ -576,6 +602,21 @@ const GameGrid: FC<GameGridProps> = ({
                 }}
               >
                 Выбрать позицию
+              </button>
+              <button
+                className="w-full px-3 py-1 text-left text-xs hover:bg-neutral-700 text-green-400 flex items-center gap-1.5"
+                onClick={() => {
+                  if (onGoToPathfinding) {
+                    onGoToPathfinding({
+                      x: contextMenu.cellX,
+                      y: contextMenu.cellY,
+                    });
+                  }
+                  setContextMenu(null);
+                }}
+              >
+                <Navigation className="w-3 h-3" />
+                <span>Перейти к</span>
               </button>
               <button
                 className="w-full px-3 py-1 text-left text-xs hover:bg-neutral-700 text-cyan-400 flex items-center gap-1.5"
