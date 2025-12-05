@@ -19,9 +19,13 @@ export interface WindowState {
   closeable: boolean;
   minimizable: boolean;
   resizable: boolean;
+  resizableX?: boolean;
+  resizableY?: boolean;
   showInDock: boolean;
   decorated: boolean;
   pinned?: boolean;
+  lockSize?: boolean;
+  lockHeight?: boolean;
   icon?: React.ReactNode;
   content: React.ReactNode;
 }
@@ -32,9 +36,13 @@ export interface WindowConfig {
   closeable?: boolean;
   minimizable?: boolean;
   resizable?: boolean;
+  resizableX?: boolean;
+  resizableY?: boolean;
   showInDock?: boolean;
   decorated?: boolean;
   pinned?: boolean;
+  lockSize?: boolean;
+  lockHeight?: boolean;
   icon?: React.ReactNode;
   defaultPosition?: WindowPosition;
   defaultSize?: WindowSize;

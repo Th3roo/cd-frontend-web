@@ -1,22 +1,39 @@
-import { Settings } from "lucide-react";
-import { FC, useEffect } from "react";
+import { Settings, Users } from "lucide-react";
+import { FC, useEffect, useRef } from "react";
 
 import Dock from "./Dock";
 import { useWindowManager } from "./WindowManager";
 import { getStoredWindowState } from "./utils";
 import Window from "./Window";
 import KeybindingsSettings from "../KeybindingsSettings";
+import { TurnOrderWindow } from "../TurnOrderWindow";
+import { TurnOrderBar } from "../TurnOrderBar";
 import { KeyBindingManager } from "../../commands";
+import { Entity } from "../../types";
 
 const DOCK_WINDOW_ID = "system-dock";
 const SETTINGS_WINDOW_ID = "settings";
+const TURN_ORDER_WINDOW_ID = "turn-order";
+const TURN_ORDER_BAR_WINDOW_ID = "turn-order-bar";
 
 interface WindowSystemProps {
   keyBindingManager: KeyBindingManager;
+  entities?: Entity[];
+  activeEntityId?: string | null;
+  playerId?: string | null;
+  onEntityClick?: (entityId: string) => void;
 }
 
-const WindowSystem: FC<WindowSystemProps> = ({ keyBindingManager }) => {
-  const { windows, openWindow, minimizeWindow } = useWindowManager();
+const WindowSystem: FC<WindowSystemProps> = ({
+  keyBindingManager,
+  entities = [],
+  activeEntityId = null,
+  playerId = null,
+  onEntityClick,
+}) => {
+  const { windows, openWindow, minimizeWindow, updateWindowContent } =
+    useWindowManager();
+  const turnOrderBarInitializedRef = useRef(false);
 
   // Автоматически открываем Dock и Settings при монтировании
   useEffect(() => {
@@ -30,6 +47,7 @@ const WindowSystem: FC<WindowSystemProps> = ({ keyBindingManager }) => {
         resizable: false,
         showInDock: false,
         decorated: false,
+        lockSize: true,
         defaultPosition: { x: 20, y: window.innerHeight - 80 },
         defaultSize: { width: 400, height: 54 },
         content: <Dock />,
@@ -58,7 +76,89 @@ const WindowSystem: FC<WindowSystemProps> = ({ keyBindingManager }) => {
         }, 0);
       }
     }
-  }, [windows, openWindow, minimizeWindow]);
+
+    const turnOrderBarExists = windows.some(
+      (w) => w.id === TURN_ORDER_BAR_WINDOW_ID,
+    );
+    if (
+      !turnOrderBarExists &&
+      entities.length > 0 &&
+      !turnOrderBarInitializedRef.current
+    ) {
+      turnOrderBarInitializedRef.current = true;
+
+      openWindow({
+        id: TURN_ORDER_BAR_WINDOW_ID,
+        title: "Turn Order Bar",
+        closeable: false,
+        minimizable: false,
+        resizable: false,
+        resizableX: true,
+        resizableY: false,
+        showInDock: false,
+        decorated: false,
+        lockHeight: true,
+        defaultPosition: { x: 450, y: 10 },
+        defaultSize: { width: window.innerWidth - 900, height: 50 },
+        content: (
+          <TurnOrderBar
+            entities={entities}
+            activeEntityId={activeEntityId}
+            playerId={playerId}
+            onEntityClick={onEntityClick}
+          />
+        ),
+      });
+    }
+  }, [
+    windows,
+    openWindow,
+    minimizeWindow,
+    entities,
+    activeEntityId,
+    playerId,
+    onEntityClick,
+  ]);
+
+  // Update TurnOrderBar content when entities or turn data changes
+  useEffect(() => {
+    const turnOrderBarWindow = windows.find(
+      (w) => w.id === TURN_ORDER_BAR_WINDOW_ID,
+    );
+    if (turnOrderBarWindow && entities.length > 0) {
+      updateWindowContent(
+        TURN_ORDER_BAR_WINDOW_ID,
+        <TurnOrderBar
+          entities={entities}
+          activeEntityId={activeEntityId}
+          playerId={playerId}
+          onEntityClick={onEntityClick}
+        />,
+      );
+    }
+  }, [
+    entities,
+    activeEntityId,
+    playerId,
+    windows,
+    updateWindowContent,
+    onEntityClick,
+  ]);
+
+  // Update TurnOrderWindow content when entities or turn data changes
+  useEffect(() => {
+    const turnOrderWindow = windows.find((w) => w.id === TURN_ORDER_WINDOW_ID);
+    if (turnOrderWindow && entities.length > 0) {
+      updateWindowContent(
+        TURN_ORDER_WINDOW_ID,
+        <TurnOrderWindow
+          entities={entities}
+          activeEntityId={activeEntityId}
+          playerId={playerId}
+        />,
+      );
+    }
+  }, [entities, activeEntityId, playerId, windows, updateWindowContent]);
 
   return (
     <>

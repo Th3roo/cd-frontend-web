@@ -49,6 +49,12 @@ export const getStoredWindowState = (
   return state[windowId] || null;
 };
 
+export const removeWindowState = (windowId: string): void => {
+  const currentState = loadWindowsState();
+  delete currentState[windowId];
+  saveWindowsState(currentState);
+};
+
 export const clampPosition = (
   position: WindowPosition,
   windowWidth: number,

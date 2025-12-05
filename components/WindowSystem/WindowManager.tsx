@@ -20,6 +20,7 @@ interface WindowManagerContextType {
   restoreWindow: (id: string) => void;
   updateWindowPosition: (id: string, position: WindowPosition) => void;
   updateWindowSize: (id: string, size: WindowSize) => void;
+  updateWindowContent: (id: string, content: ReactNode) => void;
 }
 
 const WindowManagerContext = createContext<WindowManagerContextType | null>(
@@ -105,12 +106,15 @@ export const WindowManagerProvider: FC<WindowManagerProviderProps> = ({
           height: 300,
         };
 
-        // Для system-dock всегда используем defaultSize, игнорируем localStorage
+        // Для окон с lockSize всегда используем defaultSize, игнорируем localStorage
+        // Для окон с lockHeight блокируем только высоту
         const position = stored?.position || defaultPosition;
         const size =
-          config.id === "system-dock"
+          config.lockSize === true
             ? defaultSize
-            : stored?.size || defaultSize;
+            : config.lockHeight === true && stored?.size
+              ? { width: stored.size.width, height: defaultSize.height }
+              : stored?.size || defaultSize;
         const isMinimized = stored?.isMinimized || false;
 
         const clampedPosition = clampPosition(
@@ -130,9 +134,13 @@ export const WindowManagerProvider: FC<WindowManagerProviderProps> = ({
           closeable: config.closeable ?? true,
           minimizable: config.minimizable ?? true,
           resizable: config.resizable ?? true,
+          resizableX: config.resizableX ?? config.resizable ?? true,
+          resizableY: config.resizableY ?? config.resizable ?? true,
           showInDock: config.showInDock ?? true,
           decorated: config.decorated ?? true,
           pinned: config.pinned ?? false,
+          lockSize: config.lockSize ?? false,
+          lockHeight: config.lockHeight ?? false,
           icon: config.icon,
           content: config.content,
         };
@@ -238,6 +246,17 @@ export const WindowManagerProvider: FC<WindowManagerProviderProps> = ({
     );
   }, []);
 
+  const updateWindowContent = useCallback((id: string, content: ReactNode) => {
+    setWindows((prev) =>
+      prev.map((w) => {
+        if (w.id === id) {
+          return { ...w, content };
+        }
+        return w;
+      }),
+    );
+  }, []);
+
   const value: WindowManagerContextType = {
     windows,
     openWindow,
@@ -247,6 +266,7 @@ export const WindowManagerProvider: FC<WindowManagerProviderProps> = ({
     restoreWindow,
     updateWindowPosition,
     updateWindowSize,
+    updateWindowContent,
   };
 
   return (

@@ -46,6 +46,7 @@ const App: React.FC = () => {
   const [entities, setEntities] = useState<Entity[]>([]);
   const [gameState, setGameState] = useState<GameState>(GameState.EXPLORATION);
   const [logs, setLogs] = useState<LogMessage[]>([]);
+  const [activeEntityId, setActiveEntityId] = useState<string | null>(null);
 
   // UI State
   const [commandInput, setCommandInput] = useState("");
@@ -146,6 +147,9 @@ const App: React.FC = () => {
           if (msg.gameState) {
             setGameState(msg.gameState);
           }
+          if (msg.activeEntityId !== undefined) {
+            setActiveEntityId(msg.activeEntityId);
+          }
         }
 
         // Process logs array from server
@@ -201,13 +205,30 @@ const App: React.FC = () => {
         !socketRef.current ||
         socketRef.current.readyState !== WebSocket.OPEN
       ) {
-        addLog("No connection to server", LogType.ERROR);
+        addLog("Not connected to server", LogType.ERROR);
         return;
       }
 
-      const message: GameCommand = {
+      // Check if it's player's turn (except for non-gameplay commands)
+      const nonTurnCommands = ["INSPECT", "TALK"];
+      if (
+        activeEntityId &&
+        player &&
+        activeEntityId !== player.id &&
+        !nonTurnCommands.includes(action)
+      ) {
+        const activeEntity = entityRegistry.get(activeEntityId);
+        const activeName = activeEntity?.name || "Unknown";
+        addLog(
+          `Not your turn! Waiting for ${activeName}'s turn...`,
+          LogType.ERROR,
+        );
+        return;
+      }
+
+      const message = {
         action,
-        payload,
+        payload: payload ?? {},
       };
 
       socketRef.current.send(JSON.stringify(message));
@@ -319,12 +340,23 @@ const App: React.FC = () => {
         return;
       }
 
+      // Check if it's player's turn
+      if (activeEntityId && activeEntityId !== player.id) {
+        const activeEntity = entityRegistry.get(activeEntityId);
+        const activeName = activeEntity?.name || "Unknown";
+        addLog(
+          `Not your turn! Waiting for ${activeName}'s turn...`,
+          LogType.ERROR,
+        );
+        return;
+      }
+
       const dx = x - player.pos.x;
       const dy = y - player.pos.y;
 
       sendCommand("MOVE", { dx, dy }, `переместились на (${x}, ${y})`);
     },
-    [player, sendCommand],
+    [player, sendCommand, activeEntityId, entityRegistry, addLog],
   );
 
   const handleSelectEntity = useCallback((entityId: string | null) => {
@@ -390,6 +422,17 @@ const App: React.FC = () => {
     (targetPos: Position) => {
       if (!player || !world) return;
 
+      // Check if it's player's turn
+      if (activeEntityId && activeEntityId !== player.id) {
+        const activeEntity = entityRegistry.get(activeEntityId);
+        const activeName = activeEntity?.name || "Unknown";
+        addLog(
+          `Not your turn! Waiting for ${activeName}'s turn...`,
+          LogType.ERROR,
+        );
+        return;
+      }
+
       // Stop any existing pathfinding
       if (pathfindingTimeoutRef.current) {
         clearTimeout(pathfindingTimeoutRef.current);
@@ -423,7 +466,7 @@ const App: React.FC = () => {
         { x: player.pos.x, y: player.pos.y },
       );
     },
-    [player, world],
+    [player, world, activeEntityId, entityRegistry, addLog],
   );
 
   const handleFollowEntity = useCallback((entityId: string | null) => {
@@ -436,6 +479,21 @@ const App: React.FC = () => {
   // Pathfinding execution loop - send next move command
   useEffect(() => {
     if (!isPathfinding || currentPath.length <= 1 || !player || !world) {
+      return;
+    }
+
+    // Stop pathfinding if it's not player's turn
+    if (activeEntityId && activeEntityId !== player.id) {
+      addLog(`Pathfinding stopped - not your turn`, LogType.INFO);
+      setIsPathfinding(false);
+      setCurrentPath([]);
+      setPathfindingTarget(null);
+      setWaitingForMoveResponse(false);
+      lastCommandedPosRef.current = null;
+      if (pathfindingTimeoutRef.current) {
+        clearTimeout(pathfindingTimeoutRef.current);
+        pathfindingTimeoutRef.current = null;
+      }
       return;
     }
 
@@ -483,6 +541,8 @@ const App: React.FC = () => {
     player?.pos.y,
     world,
     sendCommand,
+    activeEntityId,
+    addLog,
   ]);
 
   // Check server response - did player move to expected position?
@@ -948,7 +1008,13 @@ const App: React.FC = () => {
       </div>
 
       {/* Window System */}
-      <WindowSystem keyBindingManager={keyBindingManager} />
+      <WindowSystem
+        keyBindingManager={keyBindingManager}
+        entities={player ? [player, ...entities] : entities}
+        activeEntityId={activeEntityId}
+        playerId={player?.id || null}
+        onEntityClick={handleGoToEntity}
+      />
     </div>
   );
 };

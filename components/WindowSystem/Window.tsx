@@ -66,7 +66,7 @@ const Window: FC<WindowProps> = ({ window }) => {
   }, [isDragging, dragOffset, window.id, updateWindowPosition]);
 
   const handleResizeMouseDown = (e: React.MouseEvent) => {
-    if (!window.resizable) {
+    if (!window.resizable && !window.resizableX && !window.resizableY) {
       return;
     }
 
@@ -90,8 +90,14 @@ const Window: FC<WindowProps> = ({ window }) => {
       const deltaX = e.clientX - resizeStart.mouseX;
       const deltaY = e.clientY - resizeStart.mouseY;
 
-      const newWidth = Math.max(200, resizeStart.width + deltaX);
-      const newHeight = Math.max(150, resizeStart.height + deltaY);
+      const newWidth =
+        window.resizableX !== false
+          ? Math.max(200, resizeStart.width + deltaX)
+          : resizeStart.width;
+      const newHeight =
+        window.resizableY !== false
+          ? Math.max(150, resizeStart.height + deltaY)
+          : resizeStart.height;
 
       updateWindowSize(window.id, { width: newWidth, height: newHeight });
     };
@@ -213,11 +219,17 @@ const Window: FC<WindowProps> = ({ window }) => {
         {window.content}
       </div>
 
-      {/* Resize handle (только если resizable === true и decorated === true) */}
-      {window.resizable && window.decorated && (
+      {/* Resize handle (только если resizable или resizableX/resizableY === true) */}
+      {(window.resizable || window.resizableX || window.resizableY) && (
         <div
           onMouseDown={handleResizeMouseDown}
-          className="absolute bottom-0 right-0 w-5 h-5 cursor-nwse-resize group"
+          className={`absolute bottom-0 right-0 w-5 h-5 group ${
+            window.resizableX && window.resizableY
+              ? "cursor-nwse-resize"
+              : window.resizableX
+                ? "cursor-ew-resize"
+                : "cursor-ns-resize"
+          }`}
           style={{ zIndex: 10 }}
           title="Изменить размер"
         >
