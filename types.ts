@@ -1,135 +1,105 @@
-
+// TODO: Привести в порядок, учитывая диздок
+// https://github.com/Cognitive-Dungeon/cd-techdoc
 
 export enum EntityType {
-    PLAYER = 'PLAYER',
-    ENEMY_GOBLIN = 'GOBLIN',
-    ENEMY_ORC = 'ORC',
-    CHEST = 'CHEST',
-    ITEM = 'ITEM',
-    EXIT = 'EXIT',
-    NPC = 'NPC'
-  }
-  
-  export enum GameState {
-    EXPLORATION = 'EXPLORATION',
-    COMBAT = 'COMBAT',
-    GAME_OVER = 'GAME_OVER'
-  }
-  
-  export enum LogType {
-    INFO = 'INFO',
-    COMBAT = 'COMBAT',
-    NARRATIVE = 'NARRATIVE', // AI Generated
-    SPEECH = 'SPEECH', // User dialogue
-    ERROR = 'ERROR',
-    COMMAND = 'COMMAND',
-    SUCCESS = 'SUCCESS'
-  }
-  
-  export interface Position {
-    x: number;
-    y: number;
-  }
-  
-  export interface Stats {
-    hp: number;
-    maxHp: number;
-    stamina: number;
-    maxStamina: number;
-    strength: number;
-    gold: number;
-  }
+  PLAYER = "PLAYER",
+  ENEMY_GOBLIN = "GOBLIN",
+  ENEMY_ORC = "ORC",
+  CHEST = "CHEST",
+  ITEM = "ITEM",
+  EXIT = "EXIT",
+  NPC = "NPC",
+}
 
-  export enum ItemType {
-    POTION = 'POTION',
-    WEAPON = 'WEAPON',
-    GOLD = 'GOLD'
-  }
+export enum GameState {
+  EXPLORATION = "EXPLORATION",
+  COMBAT = "COMBAT",
+  GAME_OVER = "GAME_OVER",
+}
 
-  export interface Item {
-    id: string;
-    name: string;
-    type: ItemType;
-    value: number; // Heal amount or damage or gold amount
-    description?: string;
-  }
-  
-  export interface Entity {
-    id: string;
-    label: string; // Visual label for targeting (A, B, C...)
-    type: EntityType;
-    symbol: string;
-    color: string;
-    pos: Position;
-    stats: Stats;
-    inventory: Item[];
-    itemData?: Item; 
-    name: string;
-    isHostile: boolean;
-    isDead: boolean;
-    npcType?: 'MERCHANT' | 'HEALER' | 'GUARD';
-    
-    // Time System
-    nextActionTick: number; 
+export enum LogType {
+  INFO = "INFO",
+  COMBAT = "COMBAT",
+  NARRATIVE = "NARRATIVE", // AI Generated
+  SPEECH = "SPEECH", // User dialogue
+  ERROR = "ERROR",
+  COMMAND = "COMMAND",
+  SUCCESS = "SUCCESS",
+}
 
-    // AI & Narrative
-    personality?: 'Cowardly' | 'Furious'; 
-    aiState?: 'IDLE' | 'AGGRESSIVE' | 'FLEEING';
-  }
-  
-  export type TileEnv = 'stone' | 'grass' | 'water' | 'tree' | 'floor';
+export interface Position {
+  x: number;
+  y: number;
+}
 
-  export interface Tile {
-    x: number;
-    y: number;
-    isWall: boolean;
-    env: TileEnv;
-    isVisible: boolean;
-    isExplored: boolean;
-  }
-  
-  export interface LogMessage {
-    id: string;
-    text: string;
-    type: LogType;
-    timestamp: number;
-  }
-  
-  export interface GameWorld {
-    map: Tile[][];
-    width: number;
-    height: number;
-    level: number;
-    globalTick: number;
-  }
+export interface Stats {
+  hp: number;
+  maxHp: number;
+  stamina: number;
+  maxStamina: number;
+  strength: number;
+  gold: number;
+}
 
-  // --- ENGINE TYPES ---
+export enum ItemType {
+  POTION = "POTION",
+  WEAPON = "WEAPON",
+  GOLD = "GOLD",
+}
 
-  export type ActionType = 
-    | 'MOVE' | 'ATTACK' | 'WAIT' | 'PICKUP' | 'USE' 
-    | 'DESCEND' | 'ASCEND' | 'BUY' | 'HEAL' | 'TALK' | 'LOOK';
+export interface Item {
+  id: string;
+  name: string;
+  type: ItemType;
+  value: number; // Heal amount or damage or gold amount
+  description?: string;
+}
 
-  export interface GameAction {
-    type: ActionType;
-    payload?: any;
-    actorId?: string;
-  }
+export interface Entity {
+  id: string;
+  label: string; // Visual label for targeting (A, B, C...)
+  type: EntityType;
+  symbol: string;
+  color: string;
+  pos: Position;
+  stats: Stats;
+  inventory: Item[];
+  itemData?: Item;
+  name: string;
+  isHostile: boolean;
+  isDead: boolean;
+  npcType?: "MERCHANT" | "HEALER" | "GUARD";
 
-  export type GameEventType = 
-    | 'LOG' // Fallback for simple text
-    | 'ENTITY_MOVED' 
-    | 'ATTACK' 
-    | 'DAMAGE' 
-    | 'HEAL'
-    | 'DEATH' 
-    | 'ITEM_PICKUP' 
-    | 'LEVEL_CHANGE'
-    | 'GAME_STATE_CHANGE'
-    | 'TRANSACTION';
+  // Time System
+  nextActionTick: number;
 
-  export interface GameEvent {
-    type: GameEventType;
-    text: string; // Human readable description (Russian)
-    logType: LogType;
-    data?: any; // Structured data for AI/Logic
-  }
+  // AI & Narrative
+  personality?: "Cowardly" | "Furious";
+  aiState?: "IDLE" | "AGGRESSIVE" | "FLEEING";
+}
+
+export type TileEnv = "stone" | "grass" | "water" | "tree" | "floor";
+
+export interface Tile {
+  x: number;
+  y: number;
+  isWall: boolean;
+  env: TileEnv;
+  isVisible: boolean;
+  isExplored: boolean;
+}
+
+export interface LogMessage {
+  id: string;
+  text: string;
+  type: LogType;
+  timestamp: number;
+}
+
+export interface GameWorld {
+  map: Tile[][];
+  width: number;
+  height: number;
+  level: number;
+  globalTick: number;
+}

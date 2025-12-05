@@ -6,6 +6,7 @@ coverage/
 .vite/
 .temp/
 .tmp/
+engine_archive_20250119/
 
 # Environment and config artifacts
 .env
