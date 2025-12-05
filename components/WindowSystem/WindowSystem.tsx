@@ -122,10 +122,7 @@ const WindowSystem: FC<WindowSystemProps> = ({
 
   // Update TurnOrderBar content when entities or turn data changes
   useEffect(() => {
-    const turnOrderBarWindow = windows.find(
-      (w) => w.id === TURN_ORDER_BAR_WINDOW_ID,
-    );
-    if (turnOrderBarWindow && entities.length > 0) {
+    if (entities.length > 0) {
       updateWindowContent(
         TURN_ORDER_BAR_WINDOW_ID,
         <TurnOrderBar
@@ -136,19 +133,11 @@ const WindowSystem: FC<WindowSystemProps> = ({
         />,
       );
     }
-  }, [
-    entities,
-    activeEntityId,
-    playerId,
-    windows,
-    updateWindowContent,
-    onEntityClick,
-  ]);
+  }, [entities, activeEntityId, playerId, onEntityClick, updateWindowContent]);
 
   // Update TurnOrderWindow content when entities or turn data changes
   useEffect(() => {
-    const turnOrderWindow = windows.find((w) => w.id === TURN_ORDER_WINDOW_ID);
-    if (turnOrderWindow && entities.length > 0) {
+    if (entities.length > 0) {
       updateWindowContent(
         TURN_ORDER_WINDOW_ID,
         <TurnOrderWindow
@@ -158,7 +147,7 @@ const WindowSystem: FC<WindowSystemProps> = ({
         />,
       );
     }
-  }, [entities, activeEntityId, playerId, windows, updateWindowContent]);
+  }, [entities, activeEntityId, playerId, updateWindowContent]);
 
   return (
     <>
