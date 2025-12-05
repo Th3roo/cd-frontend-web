@@ -116,6 +116,7 @@ const Window: FC<WindowProps> = ({ window }) => {
   return (
     <div
       ref={windowRef}
+      data-window
       className={`absolute overflow-hidden ${
         window.decorated
           ? `bg-neutral-900 border rounded-lg shadow-2xl ${
@@ -142,6 +143,7 @@ const Window: FC<WindowProps> = ({ window }) => {
       {/* Заголовок окна (только если decorated === true) */}
       {window.decorated && (
         <div
+          data-window-header
           className={`flex items-center justify-between px-3 py-2 border-b select-none ${
             window.isFocused
               ? "bg-neutral-800 border-neutral-700"
