@@ -94,7 +94,8 @@ export interface LogMessage {
   text: string;
   type: LogType;
   timestamp: number;
-  position?: Position;
+  position?: Position; // Position of the event (target/action location)
+  playerPosition?: Position; // Position of player when command was executed
   commandData?: {
     action: string;
     payload?: any;

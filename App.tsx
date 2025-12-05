@@ -91,6 +91,7 @@ const App: React.FC = () => {
     type: LogType = LogType.INFO,
     commandData?: { action: string; payload?: any },
     position?: Position,
+    playerPosition?: Position,
   ) => {
     setLogs((prev) => [
       ...prev,
@@ -101,6 +102,7 @@ const App: React.FC = () => {
         timestamp: Date.now(),
         commandData,
         position,
+        playerPosition,
       },
     ]);
   };
@@ -272,7 +274,7 @@ const App: React.FC = () => {
         logMessage = `Вы выполнили ${action}`;
       }
 
-      // Определяем позицию для лога
+      // Определяем позицию события для лога
       let logPosition: Position | undefined;
       if (payload?.targetId) {
         const targetEntity = entityRegistry.get(payload.targetId);
@@ -281,12 +283,21 @@ const App: React.FC = () => {
         }
       } else if (payload?.x !== undefined && payload?.y !== undefined) {
         logPosition = { x: payload.x, y: payload.y };
-      } else if (player) {
-        logPosition = { x: player.pos.x, y: player.pos.y };
       }
 
+      // Позиция игрока в момент команды
+      const playerPosition = player
+        ? { x: player.pos.x, y: player.pos.y }
+        : undefined;
+
       // Сохраняем полные данные команды для отображения JSON
-      addLog(logMessage, LogType.COMMAND, { action, payload }, logPosition);
+      addLog(
+        logMessage,
+        LogType.COMMAND,
+        { action, payload },
+        logPosition,
+        playerPosition,
+      );
     },
     [entityRegistry, player],
   );
@@ -392,7 +403,7 @@ const App: React.FC = () => {
           `Не удалось найти путь к <span class="cursor-pointer text-orange-400 hover:underline" data-position-x="${targetPos.x}" data-position-y="${targetPos.y}">(${targetPos.x}, ${targetPos.y})</span>`,
           LogType.ERROR,
           undefined,
-          targetPos,
+          { x: player.pos.x, y: player.pos.y },
         );
         return;
       }
@@ -404,8 +415,11 @@ const App: React.FC = () => {
       setSelectedTargetPosition(targetPos);
 
       addLog(
-        `Начинаем движение к (${targetPos.x}, ${targetPos.y}), длина пути: ${path.length}`,
+        `Начинаем движение к <span class="cursor-pointer text-orange-400 hover:underline" data-position-x="${targetPos.x}" data-position-y="${targetPos.y}">(${targetPos.x}, ${targetPos.y})</span>, длина пути: ${path.length}`,
         LogType.INFO,
+        undefined,
+        targetPos,
+        { x: player.pos.x, y: player.pos.y },
       );
     },
     [player, world],
@@ -446,7 +460,14 @@ const App: React.FC = () => {
     // TODO: В будущем будем ждать нашего хода (turn-based система). ПОКА НЕ РЕАЛИЗОВАНО
     // Set timeout as fallback in case server doesn't respond
     pathfindingTimeoutRef.current = setTimeout(() => {
-      addLog(`Таймаут ожидания ответа сервера. Остановка пути.`, LogType.ERROR);
+      if (player) {
+        addLog(
+          `Таймаут ожидания ответа сервера. Остановка пути.`,
+          LogType.ERROR,
+          undefined,
+          { x: player.pos.x, y: player.pos.y },
+        );
+      }
       setIsPathfinding(false);
       setCurrentPath([]);
       setPathfindingTarget(null);
@@ -497,6 +518,8 @@ const App: React.FC = () => {
         addLog(
           `Сервер переместил на неожиданную позицию (${currentPos.x}, ${currentPos.y}). Остановка пути.`,
           LogType.ERROR,
+          undefined,
+          { x: currentPos.x, y: currentPos.y },
         );
         if (pathfindingTimeoutRef.current) {
           clearTimeout(pathfindingTimeoutRef.current);
@@ -520,8 +543,11 @@ const App: React.FC = () => {
       player.pos.y === pathfindingTarget.y
     ) {
       addLog(
-        `Достигли цели (${pathfindingTarget.x}, ${pathfindingTarget.y})`,
+        `Достигли цели <span class="cursor-pointer text-orange-400 hover:underline" data-position-x="${pathfindingTarget.x}" data-position-y="${pathfindingTarget.y}">(${pathfindingTarget.x}, ${pathfindingTarget.y})</span>`,
         LogType.SUCCESS,
+        undefined,
+        pathfindingTarget,
+        { x: player.pos.x, y: player.pos.y },
       );
       setIsPathfinding(false);
       setCurrentPath([]);

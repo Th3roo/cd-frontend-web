@@ -110,11 +110,11 @@ const GameLog: React.FC<GameLogProps> = ({
                 <span dangerouslySetInnerHTML={{ __html: log.text }} />
               </div>
               <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0">
-                {log.position && onGoToPosition && (
+                {log.playerPosition && onGoToPosition && (
                   <button
-                    onClick={() => onGoToPosition(log.position!)}
+                    onClick={() => onGoToPosition(log.playerPosition!)}
                     className="p-1 rounded hover:bg-neutral-800"
-                    title={`Перейти к (${log.position.x}, ${log.position.y})`}
+                    title={`Перейти к позиции игрока (${log.playerPosition.x}, ${log.playerPosition.y})`}
                   >
                     <MapPin size={14} className="text-blue-400" />
                   </button>
