@@ -1,5 +1,6 @@
 import { FC, useState, useCallback, useRef, useEffect } from "react";
 import { createPortal } from "react-dom";
+import { Focus } from "lucide-react";
 
 import { SYMBOLS, COLORS } from "../constants";
 import { GameWorld, Entity, Position, EntityType } from "../types";
@@ -12,9 +13,11 @@ interface GameGridProps {
   playerPos: Position;
   fovRadius: number;
   zoom: number;
+  followedEntityId?: string | null;
   onMovePlayer?: (x: number, y: number) => void;
   onSelectEntity?: (entityId: string | null) => void;
   onSelectPosition?: (x: number, y: number) => void;
+  onFollowEntity?: (entityId: string | null) => void;
   selectedTargetEntityId?: string | null;
   selectedTargetPosition?: Position | null;
 }
@@ -32,9 +35,11 @@ const GameGrid: FC<GameGridProps> = ({
   entities,
   playerPos,
   zoom,
+  followedEntityId = null,
   onMovePlayer,
   onSelectEntity,
   onSelectPosition,
+  onFollowEntity,
   selectedTargetEntityId,
   selectedTargetPosition,
 }) => {
@@ -165,6 +170,9 @@ const GameGrid: FC<GameGridProps> = ({
   const renderEntity = (entity: Entity, index: number, total: number) => {
     const isPlayer = entity.type === EntityType.PLAYER;
 
+    // Ключ для анимации - чтобы React понимал что это та же сущность
+    const animationKey = `${entity.id}-${entity.pos.x}-${entity.pos.y}`;
+
     // Позиционирование для двух сущностей в клетке
     const position =
       total === 1
@@ -263,24 +271,10 @@ const GameGrid: FC<GameGridProps> = ({
     }
 
     const cellEntities = getEntitiesAt(x, y);
-    const dist = Math.sqrt(
-      Math.pow(x - playerPos.x, 2) + Math.pow(y - playerPos.y, 2),
-    );
-    const isVisible = world.level === 0 ? true : dist <= 8;
-    const isExplored = tile.isExplored || isVisible;
+    const isVisible = true; // Всегда видимо - туман войны отключен
 
     const isSelectedPosition =
       selectedTargetPosition?.x === x && selectedTargetPosition?.y === y;
-
-    if (!isExplored) {
-      return (
-        <div
-          key={`${x}-${y}`}
-          className="bg-black border border-neutral-900"
-          style={{ width: CELL_SIZE, height: CELL_SIZE }}
-        />
-      );
-    }
 
     let bgClass = "bg-neutral-900";
     let floorSymbol = SYMBOLS.FLOOR;
@@ -303,11 +297,6 @@ const GameGrid: FC<GameGridProps> = ({
       bgClass = "bg-neutral-800";
       floorSymbol = SYMBOLS.WALL;
       floorColor = COLORS.WALL;
-    }
-
-    if (!isVisible) {
-      bgClass += " opacity-50";
-      floorColor = "text-gray-700";
     }
 
     return (
@@ -359,15 +348,6 @@ const GameGrid: FC<GameGridProps> = ({
           {floorSymbol}
         </div>
 
-        {/* Сущности в клетке */}
-        {isVisible &&
-          cellEntities.length > 0 &&
-          cellEntities
-            .slice(0, 2)
-            .map((entity, index) =>
-              renderEntity(entity, index, Math.min(cellEntities.length, 2)),
-            )}
-
         {/* Индикатор если больше 2 сущностей */}
         {isVisible && cellEntities.length > 2 && (
           <div
@@ -403,6 +383,47 @@ const GameGrid: FC<GameGridProps> = ({
         {world.map.flatMap((row, y) => row.map((_, x) => renderCell(x, y)))}
       </div>
 
+      {/* Анимированный слой для сущностей */}
+      <div
+        className="absolute top-0 left-0 pointer-events-none"
+        style={{
+          width: world.width * CELL_SIZE,
+          height: world.height * CELL_SIZE,
+        }}
+      >
+        {entities
+          .filter((e) => !e.isDead)
+          .map((entity) => {
+            const cellEntities = getEntitiesAt(entity.pos.x, entity.pos.y);
+            const entityIndex = cellEntities.findIndex(
+              (e) => e.id === entity.id,
+            );
+            const totalInCell = cellEntities.length;
+
+            // Отключаем анимацию для отслеживаемой сущности
+            const isFollowedEntity = entity.id === followedEntityId;
+            const shouldAnimate = !isFollowedEntity || !followedEntityId;
+
+            return (
+              <div
+                key={entity.id}
+                className="absolute pointer-events-none"
+                style={{
+                  left: entity.pos.x * CELL_SIZE,
+                  top: entity.pos.y * CELL_SIZE,
+                  width: CELL_SIZE,
+                  height: CELL_SIZE,
+                  transition: shouldAnimate
+                    ? "left 0.3s ease-out, top 0.3s ease-out"
+                    : "none",
+                }}
+              >
+                {renderEntity(entity, entityIndex, totalInCell)}
+              </div>
+            );
+          })}
+      </div>
+
       {/* Контекстное меню */}
       {contextMenu &&
         createPortal(
@@ -422,26 +443,44 @@ const GameGrid: FC<GameGridProps> = ({
                   Сущности:
                 </div>
                 {contextMenu.entities.map((entity) => (
-                  <button
+                  <div
                     key={entity.id}
-                    className="w-full px-3 py-2 text-left hover:bg-neutral-700 flex items-center gap-2"
-                    onClick={() => {
-                      if (onSelectEntity) {
-                        onSelectEntity(entity.id);
-                      }
-                      setContextMenu(null);
-                    }}
+                    className="border-b border-neutral-700 last:border-0"
                   >
-                    <span className={`text-xl ${entity.color}`}>
-                      {entity.symbol}
-                    </span>
-                    <span className="text-sm text-gray-300">{entity.name}</span>
-                    {entity.label && (
-                      <span className="ml-auto text-xs bg-red-600 px-1 rounded">
-                        {entity.label}
+                    <button
+                      className="w-full px-3 py-2 text-left hover:bg-neutral-700 flex items-center gap-2"
+                      onClick={() => {
+                        if (onSelectEntity) {
+                          onSelectEntity(entity.id);
+                        }
+                        setContextMenu(null);
+                      }}
+                    >
+                      <span className={`text-xl ${entity.color}`}>
+                        {entity.symbol}
                       </span>
-                    )}
-                  </button>
+                      <span className="text-sm text-gray-300">
+                        {entity.name}
+                      </span>
+                      {entity.label && (
+                        <span className="ml-auto text-xs bg-red-600 px-1 rounded">
+                          {entity.label}
+                        </span>
+                      )}
+                    </button>
+                    <button
+                      className="w-full px-3 py-1 text-left text-xs hover:bg-neutral-700 text-cyan-400 flex items-center gap-1.5"
+                      onClick={() => {
+                        if (onFollowEntity) {
+                          onFollowEntity(entity.id);
+                        }
+                        setContextMenu(null);
+                      }}
+                    >
+                      <Focus className="w-3 h-3" />
+                      <span>Следить за {entity.name}</span>
+                    </button>
+                  </div>
                 ))}
               </div>
             )}

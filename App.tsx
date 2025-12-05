@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
+import { Focus, Navigation } from "lucide-react";
 import { WindowSystem } from "./components/WindowSystem";
 
 import {
@@ -49,7 +50,10 @@ const App: React.FC = () => {
   const [isPanning, setIsPanning] = useState(false);
   const [panStart, setPanStart] = useState({ x: 0, y: 0 });
   const [panOffset, setPanOffset] = useState({ x: 0, y: 0 });
+  const [followedEntityId, setFollowedEntityId] = useState<string | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+  const [playerPosKey, setPlayerPosKey] = useState<string>("");
+  const followInitializedRef = useRef(false);
 
   // --- Helper Functions ---
   const addLog = (
@@ -95,6 +99,11 @@ const App: React.FC = () => {
               inventory: msg.player.inventory ?? [],
             };
             setPlayer(normalizedPlayer);
+            // Инициализируем следование за игроком только один раз при первой загрузке
+            if (!followInitializedRef.current && normalizedPlayer.id) {
+              setFollowedEntityId(normalizedPlayer.id);
+              followInitializedRef.current = true;
+            }
           }
           if (Array.isArray(msg.entities)) {
             setEntities(msg.entities);
@@ -231,6 +240,13 @@ const App: React.FC = () => {
     console.log("Выбрана позиция:", x, y);
   }, []);
 
+  const handleFollowEntity = useCallback((entityId: string | null) => {
+    setFollowedEntityId(entityId);
+    if (entityId) {
+      console.log("Следим за сущностью:", entityId);
+    }
+  }, []);
+
   // --- UI Handlers ---
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === "Enter") {
@@ -320,6 +336,8 @@ const App: React.FC = () => {
 
   // Обработка панорамирования (drag to pan)
   useEffect(() => {
+    let hasMoved = false;
+
     const handleMouseDown = (e: MouseEvent) => {
       if (e.button === 0 && containerRef.current) {
         // Проверяем, что клик не на окне (Window)
@@ -338,10 +356,33 @@ const App: React.FC = () => {
           e.clientY >= rect.top &&
           e.clientY <= rect.bottom
         ) {
+          hasMoved = false;
           setIsPanning(true);
+
+          // Если включено следование, вычисляем текущий offset камеры
+          let currentOffset = panOffset;
+          if (followedEntityId && world && player) {
+            const followedEntity = [player, ...entities].find(
+              (entity) => entity.id === followedEntityId,
+            );
+            if (followedEntity && containerRef.current) {
+              const containerWidth = containerRef.current.clientWidth;
+              const containerHeight = containerRef.current.clientHeight;
+              const CELL_SIZE = 50 * zoom;
+              const entityPixelX =
+                followedEntity.pos.x * CELL_SIZE + CELL_SIZE / 2;
+              const entityPixelY =
+                followedEntity.pos.y * CELL_SIZE + CELL_SIZE / 2;
+              currentOffset = {
+                x: containerWidth / 2 - entityPixelX,
+                y: containerHeight / 2 - entityPixelY,
+              };
+            }
+          }
+
           setPanStart({
-            x: e.clientX - panOffset.x,
-            y: e.clientY - panOffset.y,
+            x: e.clientX - currentOffset.x,
+            y: e.clientY - currentOffset.y,
           });
           e.preventDefault();
         }
@@ -350,6 +391,11 @@ const App: React.FC = () => {
 
     const handleMouseMove = (e: MouseEvent) => {
       if (isPanning) {
+        hasMoved = true;
+        // Отключаем следование только при реальном перемещении
+        if (followedEntityId && hasMoved) {
+          setFollowedEntityId(null);
+        }
         e.preventDefault();
         setPanOffset({
           x: e.clientX - panStart.x,
@@ -360,6 +406,7 @@ const App: React.FC = () => {
 
     const handleMouseUp = () => {
       setIsPanning(false);
+      hasMoved = false;
     };
 
     document.addEventListener("mousedown", handleMouseDown);
@@ -373,7 +420,61 @@ const App: React.FC = () => {
       document.removeEventListener("mousemove", handleMouseMove);
       document.removeEventListener("mouseup", handleMouseUp);
     };
-  }, [isPanning, panStart, panOffset]);
+  }, [
+    isPanning,
+    panStart,
+    panOffset,
+    followedEntityId,
+    player,
+    entities,
+    world,
+    zoom,
+  ]);
+
+  // Обновляем ключ позиции при изменении позиции отслеживаемой сущности
+  useEffect(() => {
+    if (followedEntityId && player) {
+      const followedEntity = [player, ...entities].find(
+        (e) => e.id === followedEntityId,
+      );
+
+      if (followedEntity) {
+        const newPosKey = `${followedEntity.pos.x},${followedEntity.pos.y}`;
+        if (newPosKey !== playerPosKey) {
+          setPlayerPosKey(newPosKey);
+        }
+      }
+    }
+  }, [player, entities, followedEntityId, playerPosKey]);
+
+  // Вычисляем offset для центрирования на отслеживаемой сущности
+  const cameraOffset =
+    followedEntityId && containerRef.current && world && player
+      ? (() => {
+          // Определяем, за какой сущностью следим
+          const followedEntity = [player, ...entities].find(
+            (e) => e.id === followedEntityId,
+          );
+
+          if (!followedEntity) return panOffset;
+
+          const container = containerRef.current;
+          const containerWidth = container.clientWidth;
+          const containerHeight = container.clientHeight;
+
+          const CELL_SIZE = 50 * zoom;
+
+          // Позиция отслеживаемой сущности в пикселях относительно сетки
+          const entityPixelX = followedEntity.pos.x * CELL_SIZE + CELL_SIZE / 2;
+          const entityPixelY = followedEntity.pos.y * CELL_SIZE + CELL_SIZE / 2;
+
+          // Вычисляем offset, чтобы сущность была в центре контейнера
+          const offsetX = containerWidth / 2 - entityPixelX;
+          const offsetY = containerHeight / 2 - entityPixelY;
+
+          return { x: offsetX, y: offsetY };
+        })()
+      : panOffset;
 
   if (!world || !player) {
     return <div className="text-white p-10">Connecting to server...</div>;
@@ -395,15 +496,81 @@ const App: React.FC = () => {
         <div className="flex-1 bg-black flex flex-col relative border-r border-neutral-800">
           <div
             ref={containerRef}
-            className={`absolute inset-0 overflow-hidden flex items-center justify-center p-4 ${isPanning ? "cursor-grabbing" : "cursor-grab"}`}
+            className={`absolute inset-0 overflow-hidden ${isPanning ? "cursor-grabbing" : "cursor-grab"}`}
           >
-            {/* Индикатор зума */}
-            <div className="absolute top-2 right-2 bg-black/80 text-white px-3 py-1 rounded text-xs font-mono z-50 border border-neutral-600 pointer-events-none">
-              Zoom: {(zoom * 100).toFixed(0)}%
+            {/* Индикатор зума и переключатель следования */}
+            <div className="absolute top-2 right-2 flex flex-col gap-2 z-50">
+              <div className="bg-black/80 text-white px-3 py-1 rounded text-xs font-mono border border-neutral-600 pointer-events-none">
+                Zoom: {(zoom * 100).toFixed(0)}%
+              </div>
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  if (followedEntityId) {
+                    // Вычисляем и сохраняем текущий offset камеры перед выходом из режима следования
+                    if (containerRef.current && world) {
+                      const followedEntity = [player, ...entities].find(
+                        (e) => e.id === followedEntityId,
+                      );
+
+                      if (followedEntity) {
+                        const containerWidth = containerRef.current.clientWidth;
+                        const containerHeight =
+                          containerRef.current.clientHeight;
+                        const CELL_SIZE = 50 * zoom;
+                        const entityPixelX =
+                          followedEntity.pos.x * CELL_SIZE + CELL_SIZE / 2;
+                        const entityPixelY =
+                          followedEntity.pos.y * CELL_SIZE + CELL_SIZE / 2;
+                        const offsetX = containerWidth / 2 - entityPixelX;
+                        const offsetY = containerHeight / 2 - entityPixelY;
+                        setPanOffset({ x: offsetX, y: offsetY });
+                      }
+                    }
+                    setFollowedEntityId(null);
+                  } else {
+                    setFollowedEntityId(player?.id || null);
+                  }
+                }}
+                onMouseDown={(e) => e.stopPropagation()}
+                className={`px-3 py-1 rounded text-xs font-mono border transition-colors flex items-center gap-1.5 ${
+                  followedEntityId
+                    ? "bg-cyan-600/80 text-white border-cyan-500"
+                    : "bg-black/80 text-gray-400 border-neutral-600"
+                }`}
+              >
+                {followedEntityId ? (
+                  followedEntityId === player?.id ? (
+                    <>
+                      <Focus className="w-3 h-3" />
+                      <span>Следовать</span>
+                    </>
+                  ) : (
+                    <>
+                      <Focus className="w-3 h-3" />
+                      <span>
+                        Следую за{" "}
+                        {[player, ...entities].find(
+                          (e) => e.id === followedEntityId,
+                        )?.name || "сущностью"}
+                      </span>
+                    </>
+                  )
+                ) : (
+                  <>
+                    <Navigation className="w-3 h-3" />
+                    <span>Свободно</span>
+                  </>
+                )}
+              </button>
             </div>
             <div
+              className="absolute top-0 left-0"
               style={{
-                transform: `translate(${panOffset.x}px, ${panOffset.y}px)`,
+                transform: `translate(${cameraOffset.x}px, ${cameraOffset.y}px)`,
+                transition: followedEntityId
+                  ? "transform 0.3s ease-out"
+                  : "none",
               }}
             >
               <GameGrid
@@ -412,9 +579,11 @@ const App: React.FC = () => {
                 playerPos={player.pos}
                 fovRadius={8}
                 zoom={zoom}
+                followedEntityId={followedEntityId}
                 onMovePlayer={handleMovePlayer}
                 onSelectEntity={handleSelectEntity}
                 onSelectPosition={handleSelectPosition}
+                onFollowEntity={handleFollowEntity}
                 selectedTargetEntityId={selectedTargetEntityId}
                 selectedTargetPosition={selectedTargetPosition}
               />
