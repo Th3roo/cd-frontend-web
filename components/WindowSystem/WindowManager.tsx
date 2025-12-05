@@ -129,6 +129,7 @@ export const WindowManagerProvider: FC<WindowManagerProviderProps> = ({
           zIndex: nextZIndex,
           closeable: config.closeable ?? true,
           minimizable: config.minimizable ?? true,
+          resizable: config.resizable ?? true,
           showInDock: config.showInDock ?? true,
           decorated: config.decorated ?? true,
           pinned: config.pinned ?? false,

@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { WindowSystem } from "./components/WindowSystem";
 
 import {
@@ -13,9 +13,12 @@ import { GameWorld, Entity, GameState, LogMessage, LogType } from "./types";
 
 const App: React.FC = () => {
   const socketRef = useRef<WebSocket | null>(null);
-  const keyBindingManager = useRef<KeyBindingManager>(
-    new KeyBindingManager(DEFAULT_KEY_BINDINGS),
-  );
+  const keyBindingManager = useMemo(() => {
+    const manager = new KeyBindingManager(DEFAULT_KEY_BINDINGS);
+    // Загружаем сохраненные настройки из localStorage
+    manager.loadFromLocalStorage();
+    return manager;
+  }, []);
 
   // --- React State (For Rendering) ---
   const [world, setWorld] = useState<GameWorld | null>(null);
@@ -28,7 +31,11 @@ const App: React.FC = () => {
   const [commandInput, setCommandInput] = useState("");
 
   // --- Helper Functions ---
-  const addLog = (text: string, type: LogType = LogType.INFO) => {
+  const addLog = (
+    text: string,
+    type: LogType = LogType.INFO,
+    commandData?: { action: string; payload?: any },
+  ) => {
     setLogs((prev) => [
       ...prev,
       {
@@ -36,6 +43,7 @@ const App: React.FC = () => {
         text,
         type,
         timestamp: Date.now(),
+        commandData,
       },
     ]);
   };
@@ -138,15 +146,32 @@ const App: React.FC = () => {
       };
 
       socketRef.current.send(JSON.stringify(message));
-      // TODO: Localisation
-      // Use description if provided, otherwise show action + payload
-      const logMessage = description
-        ? `Вы ${description}`
-        : `Вызвана команда ${action}${payload ? ` ${JSON.stringify(payload)}` : ""}`;
 
-      addLog(logMessage, LogType.COMMAND);
+      // Форматируем сообщение лога
+      let logMessage: string;
+
+      if (description) {
+        // Если есть описание, используем его
+        logMessage = `Вы ${description}`;
+      } else if (payload?.targetId) {
+        // Если есть targetId, ищем сущность по ID
+        const targetEntity = entities.find((e) => e.id === payload.targetId);
+        const targetName = targetEntity
+          ? targetEntity.name
+          : `ID:${payload.targetId}`;
+        logMessage = `Вы выполнили ${action} на ${targetName}`;
+      } else if (payload?.x !== undefined && payload?.y !== undefined) {
+        // Если есть позиция x, y
+        logMessage = `Вы выполнили ${action} на позицию (${payload.x}, ${payload.y})`;
+      } else {
+        // Просто показываем действие
+        logMessage = `Вы выполнили ${action}`;
+      }
+
+      // Сохраняем полные данные команды для отображения JSON
+      addLog(logMessage, LogType.COMMAND, { action, payload });
     },
-    [],
+    [entities],
   );
 
   const sendTextCommand = (text: string) => {
@@ -169,7 +194,7 @@ const App: React.FC = () => {
   // Global key handler for game controls
   useEffect(() => {
     const handleGlobalKeyDown = (e: KeyboardEvent) => {
-      // Ignore if typing in input field
+      // Ignore if typing in input
       if (
         e.target instanceof HTMLInputElement ||
         e.target instanceof HTMLTextAreaElement
@@ -177,10 +202,33 @@ const App: React.FC = () => {
         return;
       }
 
-      const command = keyBindingManager.current.getCommand(e.code);
+      const command = keyBindingManager.getCommand(e.code);
       if (command) {
         e.preventDefault();
-        sendCommand(command.action, command.payload, command.description);
+
+        // Проверяем, требует ли команда выбор цели
+        let payload = command.payload || {};
+
+        // Если требуется выбор сущности, добавляем targetId
+        if (command.requiresEntityTarget) {
+          // TODO: Пока хардкод, в будущем здесь будет UI для выбора сущности
+          payload = {
+            ...payload,
+            targetId: "1", // Заглушка: хардкод id = "1" (string как на сервере)
+          };
+        }
+
+        // Если требуется выбор позиции, добавляем x, y
+        if (command.requiresPositionTarget) {
+          // TODO: Пока хардкод, в будущем здесь будет UI для выбора позиции
+          payload = {
+            ...payload,
+            x: 5, // Заглушка: хардкод позиции
+            y: 5,
+          };
+        }
+
+        sendCommand(command.action, payload, command.description);
       }
     };
 
@@ -188,7 +236,7 @@ const App: React.FC = () => {
     return () => {
       window.removeEventListener("keydown", handleGlobalKeyDown);
     };
-  }, [sendCommand]);
+  }, [sendCommand, keyBindingManager]);
 
   if (!world || !player) {
     return <div className="text-white p-10">Connecting to server...</div>;
@@ -237,7 +285,7 @@ const App: React.FC = () => {
       </div>
 
       {/* Window System */}
-      <WindowSystem />
+      <WindowSystem keyBindingManager={keyBindingManager} />
     </div>
   );
 };

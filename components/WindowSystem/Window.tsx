@@ -8,11 +8,23 @@ interface WindowProps {
 }
 
 const Window: FC<WindowProps> = ({ window }) => {
-  const { closeWindow, focusWindow, minimizeWindow, updateWindowPosition } =
-    useWindowManager();
+  const {
+    closeWindow,
+    focusWindow,
+    minimizeWindow,
+    updateWindowPosition,
+    updateWindowSize,
+  } = useWindowManager();
   const windowRef = useRef<HTMLDivElement>(null);
   const [isDragging, setIsDragging] = useState(false);
   const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
+  const [isResizing, setIsResizing] = useState(false);
+  const [resizeStart, setResizeStart] = useState({
+    width: 0,
+    height: 0,
+    mouseX: 0,
+    mouseY: 0,
+  });
 
   const handleMouseDown = (e: React.MouseEvent) => {
     // Для неоформленных окон - перетаскивание работает везде
@@ -52,6 +64,50 @@ const Window: FC<WindowProps> = ({ window }) => {
       document.removeEventListener("mouseup", handleMouseUp);
     };
   }, [isDragging, dragOffset, window.id, updateWindowPosition]);
+
+  const handleResizeMouseDown = (e: React.MouseEvent) => {
+    if (!window.resizable) {
+      return;
+    }
+
+    e.preventDefault();
+    e.stopPropagation();
+    setIsResizing(true);
+    setResizeStart({
+      width: window.size.width,
+      height: window.size.height,
+      mouseX: e.clientX,
+      mouseY: e.clientY,
+    });
+  };
+
+  useEffect(() => {
+    if (!isResizing) {
+      return;
+    }
+
+    const handleMouseMove = (e: MouseEvent) => {
+      const deltaX = e.clientX - resizeStart.mouseX;
+      const deltaY = e.clientY - resizeStart.mouseY;
+
+      const newWidth = Math.max(200, resizeStart.width + deltaX);
+      const newHeight = Math.max(150, resizeStart.height + deltaY);
+
+      updateWindowSize(window.id, { width: newWidth, height: newHeight });
+    };
+
+    const handleMouseUp = () => {
+      setIsResizing(false);
+    };
+
+    document.addEventListener("mousemove", handleMouseMove);
+    document.addEventListener("mouseup", handleMouseUp);
+
+    return () => {
+      document.removeEventListener("mousemove", handleMouseMove);
+      document.removeEventListener("mouseup", handleMouseUp);
+    };
+  }, [isResizing, resizeStart, window.id, updateWindowSize]);
 
   if (window.isMinimized) {
     return null;
@@ -154,6 +210,19 @@ const Window: FC<WindowProps> = ({ window }) => {
       >
         {window.content}
       </div>
+
+      {/* Resize handle (только если resizable === true и decorated === true) */}
+      {window.resizable && window.decorated && (
+        <div
+          onMouseDown={handleResizeMouseDown}
+          className="absolute bottom-0 right-0 w-5 h-5 cursor-nwse-resize group"
+          style={{ zIndex: 10 }}
+          title="Изменить размер"
+        >
+          <div className="absolute bottom-1 right-1 w-4 h-4 border-r-2 border-b-2 border-gray-500 group-hover:border-gray-300 transition-colors opacity-60 group-hover:opacity-100" />
+          <div className="absolute bottom-2 right-2 w-2 h-2 border-r-2 border-b-2 border-gray-500 group-hover:border-gray-300 transition-colors opacity-40 group-hover:opacity-80" />
+        </div>
+      )}
     </div>
   );
 };

@@ -18,6 +18,7 @@ export interface WindowState {
   zIndex: number;
   closeable: boolean;
   minimizable: boolean;
+  resizable: boolean;
   showInDock: boolean;
   decorated: boolean;
   pinned?: boolean;
@@ -30,6 +31,7 @@ export interface WindowConfig {
   title: string;
   closeable?: boolean;
   minimizable?: boolean;
+  resizable?: boolean;
   showInDock?: boolean;
   decorated?: boolean;
   pinned?: boolean;

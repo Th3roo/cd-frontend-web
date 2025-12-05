@@ -94,6 +94,10 @@ export interface LogMessage {
   text: string;
   type: LogType;
   timestamp: number;
+  commandData?: {
+    action: string;
+    payload?: any;
+  };
 }
 
 export interface GameWorld {

@@ -5,11 +5,17 @@ import Dock from "./Dock";
 import { useWindowManager } from "./WindowManager";
 import { getStoredWindowState } from "./utils";
 import Window from "./Window";
+import KeybindingsSettings from "../KeybindingsSettings";
+import { KeyBindingManager } from "../../commands";
 
 const DOCK_WINDOW_ID = "system-dock";
 const SETTINGS_WINDOW_ID = "settings";
 
-const WindowSystem: FC = () => {
+interface WindowSystemProps {
+  keyBindingManager: KeyBindingManager;
+}
+
+const WindowSystem: FC<WindowSystemProps> = ({ keyBindingManager }) => {
   const { windows, openWindow, minimizeWindow } = useWindowManager();
 
   // Автоматически открываем Dock и Settings при монтировании
@@ -21,6 +27,7 @@ const WindowSystem: FC = () => {
         title: "Dock",
         closeable: false,
         minimizable: false,
+        resizable: false,
         showInDock: false,
         decorated: false,
         defaultPosition: { x: 20, y: window.innerHeight - 80 },
@@ -36,15 +43,12 @@ const WindowSystem: FC = () => {
         title: "Settings",
         closeable: false,
         minimizable: true,
+        resizable: true,
         pinned: true,
         icon: <Settings size={20} />,
         defaultPosition: { x: 400, y: 100 },
         defaultSize: { width: 450, height: 350 },
-        content: (
-          <div className="p-4 text-gray-300">
-            <p>Тут будут настройки. Возможно</p>
-          </div>
-        ),
+        content: <KeybindingsSettings keyBindingManager={keyBindingManager} />,
       });
 
       const stored = getStoredWindowState(SETTINGS_WINDOW_ID);

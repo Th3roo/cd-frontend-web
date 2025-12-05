@@ -20,6 +20,10 @@ export interface GameCommand {
   label?: string;
   /** Human-readable description in past tense for logging (e.g., "moved up", "picked up item") */
   description?: string;
+  /** Whether this command requires selecting a target entity (adds targetId to payload) */
+  requiresEntityTarget?: boolean;
+  /** Whether this command requires selecting a target position (adds x, y to payload) */
+  requiresPositionTarget?: boolean;
 }
 
 // --- Predefined Commands ---
@@ -50,6 +54,15 @@ export const CommandRight: GameCommand = {
   payload: { dx: 1, dy: 0 },
   label: "Move Right",
   description: "пошли направо",
+};
+
+export const CommandCustom: GameCommand = {
+  action: "CUSTOM",
+  payload: {},
+  label: "Custom Command",
+  description: "кастомная команда",
+  requiresEntityTarget: false,
+  requiresPositionTarget: false,
 };
 
 // --- Key Bindings Map ---
@@ -215,6 +228,16 @@ export class KeyBindingManager {
         console.error("Failed to load key bindings from localStorage:", error);
       }
     }
+  }
+
+  /**
+   * Reset bindings to default configuration
+   * Clears current bindings and reloads defaults
+   */
+  resetToDefaults(): void {
+    this.bindings.clear();
+    this.loadBindings(DEFAULT_KEY_BINDINGS);
+    localStorage.removeItem("keyBindings");
   }
 
   // --- Example: Creating Custom Commands ---
