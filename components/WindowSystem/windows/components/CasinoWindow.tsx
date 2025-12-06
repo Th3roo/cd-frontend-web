@@ -12,6 +12,7 @@ const CasinoWindow: FC<CasinoWindowProps> = ({ onClose }) => {
   const [percentage, setPercentage] = useState(14);
   const [baseWinnings] = useState(12050);
   const [baseTotal] = useState(70055020);
+  const [hasReset, setHasReset] = useState(false);
 
   useEffect(() => {
     if (isLoading && progress < 100) {
@@ -21,6 +22,16 @@ const CasinoWindow: FC<CasinoWindowProps> = ({ onClose }) => {
           if (next >= 100) {
             setIsLoading(false);
             return 100;
+          }
+
+          // Random reset between 70-99%
+          if (next >= 70 && next < 99 && !hasReset && Math.random() < 0.15) {
+            setHasReset(true);
+            setIsLoading(false);
+            setProgress(0);
+            setPercentage(0);
+            setWinnings(0);
+            return 0;
           }
 
           // Update values as progress increases
@@ -38,12 +49,15 @@ const CasinoWindow: FC<CasinoWindowProps> = ({ onClose }) => {
 
       return () => clearInterval(interval);
     }
-  }, [isLoading, progress, baseWinnings, baseTotal]);
+  }, [isLoading, progress, baseWinnings, baseTotal, hasReset]);
 
   const handleYes = () => {
     if (!isLoading) {
       setProgress(0);
       setIsLoading(true);
+      setHasReset(false);
+      setPercentage(14);
+      setWinnings(12050);
     }
   };
 
@@ -64,21 +78,36 @@ const CasinoWindow: FC<CasinoWindowProps> = ({ onClose }) => {
 
         {/* Message */}
         <div className="text-center space-y-2">
-          <p className="text-lg">
-            Казино взломанно на{" "}
-            <span className="font-bold text-green-400">{percentage}%</span>.
-          </p>
-          <p className="text-lg">
-            Выкачанно{" "}
-            <span className="font-bold text-yellow-400">
-              {winnings.toLocaleString("ru-RU")} руб.
-            </span>{" "}
-            из{" "}
-            <span className="font-bold text-red-400">
-              {total.toLocaleString("ru-RU")} руб.
-            </span>
-          </p>
-          <p className="text-xl font-semibold mt-4">Продолжить?</p>
+          {hasReset && winnings === 0 ? (
+            <div className="text-center">
+              <p className="text-2xl font-bold text-red-500 mb-4">💸</p>
+              <p className="text-lg font-semibold text-red-400">
+                Вы депнули все что можно.
+              </p>
+              <p className="text-lg font-semibold text-red-400">
+                Теперь вы без трусов и без собачки
+              </p>
+              <p className="text-xl font-semibold mt-4">Попробовать еще раз?</p>
+            </div>
+          ) : (
+            <>
+              <p className="text-lg">
+                Казино взломанно на{" "}
+                <span className="font-bold text-green-400">{percentage}%</span>.
+              </p>
+              <p className="text-lg">
+                Выкачанно{" "}
+                <span className="font-bold text-yellow-400">
+                  {winnings.toLocaleString("ru-RU")} руб.
+                </span>{" "}
+                из{" "}
+                <span className="font-bold text-red-400">
+                  {total.toLocaleString("ru-RU")} руб.
+                </span>
+              </p>
+              <p className="text-xl font-semibold mt-4">Продолжить?</p>
+            </>
+          )}
         </div>
 
         {/* Progress bar */}

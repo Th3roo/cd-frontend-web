@@ -1,5 +1,5 @@
 import React from "react";
-import { Entity } from "../types";
+import { Entity } from "../../../../types";
 import { Users, Sword, User, Heart, Zap, Coins, Shield } from "lucide-react";
 
 interface TurnOrderWindowProps {
@@ -15,7 +15,7 @@ export const TurnOrderWindow: React.FC<TurnOrderWindowProps> = ({
 }) => {
   // Sort entities by nextActionTick to create turn order
   const sortedEntities = [...entities].sort(
-    (a, b) => a.nextActionTick - b.nextActionTick
+    (a, b) => a.nextActionTick - b.nextActionTick,
   );
 
   const getEntityIcon = (entity: Entity) => {
@@ -53,10 +53,10 @@ export const TurnOrderWindow: React.FC<TurnOrderWindowProps> = ({
               entity.id === activeEntityId
                 ? "border-cyan-500 bg-cyan-950/30 shadow-lg shadow-cyan-500/20"
                 : entity.id === playerId
-                ? "border-blue-500"
-                : entity.isHostile
-                ? "border-red-600"
-                : "border-neutral-700"
+                  ? "border-blue-500"
+                  : entity.isHostile
+                    ? "border-red-600"
+                    : "border-neutral-700"
             } ${entity.isDead ? "opacity-50" : ""}`}
           >
             {/* Position badge */}
@@ -83,7 +83,9 @@ export const TurnOrderWindow: React.FC<TurnOrderWindowProps> = ({
               {/* Main info */}
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2 mb-1">
-                  <h3 className={`font-bold text-lg truncate ${getStatusClass(entity)}`}>
+                  <h3
+                    className={`font-bold text-lg truncate ${getStatusClass(entity)}`}
+                  >
                     {entity.name}
                   </h3>
                   <span className="flex-shrink-0 text-xs px-2 py-0.5 bg-neutral-700 rounded">
@@ -138,7 +140,10 @@ export const TurnOrderWindow: React.FC<TurnOrderWindowProps> = ({
 
                     {/* Stamina Bar */}
                     <div className="flex items-center gap-2">
-                      <Zap size={14} className="text-yellow-400 flex-shrink-0" />
+                      <Zap
+                        size={14}
+                        className="text-yellow-400 flex-shrink-0"
+                      />
                       <div className="flex-1">
                         <div className="flex justify-between text-xs mb-1">
                           <span className="text-gray-400">Stamina</span>
@@ -162,7 +167,9 @@ export const TurnOrderWindow: React.FC<TurnOrderWindowProps> = ({
                       <div className="flex items-center gap-1 text-xs">
                         <Shield size={12} className="text-gray-400" />
                         <span className="text-gray-400">STR:</span>
-                        <span className="font-mono font-bold">{entity.stats.strength}</span>
+                        <span className="font-mono font-bold">
+                          {entity.stats.strength}
+                        </span>
                       </div>
                       <div className="flex items-center gap-1 text-xs">
                         <Coins size={12} className="text-yellow-400" />
@@ -208,7 +215,8 @@ export const TurnOrderWindow: React.FC<TurnOrderWindowProps> = ({
               <div className="w-2 h-2 bg-orange-400 rounded-full animate-pulse" />
               <span>
                 Waiting for{" "}
-                {sortedEntities.find((e) => e.id === activeEntityId)?.name || "Unknown"}
+                {sortedEntities.find((e) => e.id === activeEntityId)?.name ||
+                  "Unknown"}
                 's turn...
               </span>
             </div>

@@ -16,7 +16,7 @@ import {
   CommandUp,
   GameCommand,
   KeyBindingManager,
-} from "../commands";
+} from "../../../../commands";
 
 interface KeybindingsSettingsProps {
   keyBindingManager: KeyBindingManager;
@@ -617,15 +617,15 @@ const KeybindingsSettings: FC<KeybindingsSettingsProps> = ({
 
             {onOpenCasino && (
               <div className="p-4 bg-neutral-800/50 border border-neutral-700 rounded">
-                <h3 className="text-md font-semibold mb-2">🎰 Пасхалка</h3>
+                <h3 className="text-md font-semibold mb-2">Gacha</h3>
                 <p className="text-sm text-gray-400 mb-3">
-                  Откройте секретное окно для настоящих ценителей мемов
+                  Покрути баннер чтобы выбить новую собачку!
                 </p>
                 <button
                   onClick={onOpenCasino}
                   className="px-4 py-2 bg-red-600 hover:bg-red-500 border border-red-500 rounded transition-colors text-sm font-semibold"
                 >
-                  🎰 Открыть казино
+                  Крутить баннер!
                 </button>
               </div>
             )}

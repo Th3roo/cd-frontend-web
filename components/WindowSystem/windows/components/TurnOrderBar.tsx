@@ -1,5 +1,5 @@
 import React, { useRef, useEffect, useState } from "react";
-import { Entity } from "../types";
+import { Entity } from "../../../../types";
 
 interface TurnOrderBarProps {
   entities: Entity[];
