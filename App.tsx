@@ -165,7 +165,10 @@ const App: React.FC = () => {
 
   // --- WebSocket: Connect to Server ---
   useEffect(() => {
-    const ws = new WebSocket("ws://localhost:8080/ws");
+    // Используем относительный путь для работы через Vite proxy
+    const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
+    const wsUrl = `${protocol}//${window.location.host}/ws`;
+    const ws = new WebSocket(wsUrl);
     socketRef.current = ws;
 
     ws.onopen = () => {
