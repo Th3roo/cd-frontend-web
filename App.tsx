@@ -966,15 +966,6 @@ const App: React.FC = () => {
     const offsetX = containerWidth / 2 - entityPixelX;
     const offsetY = containerHeight / 2 - entityPixelY;
 
-    console.log("Camera offset calculation:", {
-      entityPos: followedEntity.pos,
-      entityPixel: { x: entityPixelX, y: entityPixelY },
-      containerSize: { width: containerWidth, height: containerHeight },
-      cellSize: CELL_SIZE,
-      zoom,
-      calculatedOffset: { x: offsetX, y: offsetY },
-    });
-
     return { x: offsetX, y: offsetY };
   }, [
     followedEntityId,
