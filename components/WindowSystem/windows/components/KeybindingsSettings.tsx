@@ -20,8 +20,10 @@ import {
 
 interface KeybindingsSettingsProps {
   keyBindingManager: KeyBindingManager;
-  resetWindowLayout?: () => Promise<void>;
-  onOpenCasino?: () => void;
+  resetWindowLayout: () => Promise<void>;
+  onOpenCasino: () => void;
+  splashNotificationsEnabled: boolean;
+  onToggleSplashNotifications: (enabled: boolean) => void;
 }
 
 interface KeyBindingRow {
@@ -71,8 +73,10 @@ const KeybindingsSettings: FC<KeybindingsSettingsProps> = ({
   keyBindingManager,
   resetWindowLayout,
   onOpenCasino,
+  splashNotificationsEnabled,
+  onToggleSplashNotifications,
 }) => {
-  const [activeTab, setActiveTab] = useState<"keybindings" | "windows">(
+  const [activeTab, setActiveTab] = useState<"keybindings" | "windows" | "ui">(
     "keybindings",
   );
   const [bindings, setBindings] = useState<KeyBindingRow[]>(() => {
@@ -314,6 +318,16 @@ const KeybindingsSettings: FC<KeybindingsSettingsProps> = ({
           }`}
         >
           Система окон
+        </button>
+        <button
+          onClick={() => setActiveTab("ui")}
+          className={`px-4 py-2 rounded text-left transition-colors ${
+            activeTab === "ui"
+              ? "bg-neutral-700 text-white"
+              : "text-gray-400 hover:bg-neutral-800 hover:text-gray-300"
+          }`}
+        >
+          UI
         </button>
       </div>
 
@@ -629,6 +643,36 @@ const KeybindingsSettings: FC<KeybindingsSettingsProps> = ({
                 </button>
               </div>
             )}
+          </>
+        )}
+
+        {activeTab === "ui" && (
+          <>
+            <h2 className="text-lg font-bold mb-4">Настройки интерфейса</h2>
+            <div className="space-y-4">
+              <div className="flex items-center justify-between p-4 bg-neutral-800 rounded-lg">
+                <div>
+                  <h3 className="font-medium text-white mb-1">
+                    Всплывающие уведомления
+                  </h3>
+                  <p className="text-sm text-gray-400">
+                    Показывать текстовые уведомления в центре экрана (например,
+                    "Ваш ход")
+                  </p>
+                </div>
+                <label className="relative inline-flex items-center cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={splashNotificationsEnabled}
+                    onChange={(e) =>
+                      onToggleSplashNotifications(e.target.checked)
+                    }
+                    className="sr-only peer"
+                  />
+                  <div className="w-11 h-6 bg-gray-600 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-cyan-500 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-cyan-600"></div>
+                </label>
+              </div>
+            </div>
           </>
         )}
       </div>

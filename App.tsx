@@ -18,6 +18,10 @@ import {
 } from "./commands";
 import { ContextMenu } from "./components/ContextMenu";
 import GameGrid from "./components/GameGrid";
+import {
+  SplashNotification,
+  useSplashNotifications,
+} from "./components/SplashNotification";
 import StatusPanel from "./components/StatusPanel";
 import { WindowManagerProvider, WindowSystem } from "./components/WindowSystem";
 import {
@@ -49,9 +53,10 @@ const App: React.FC = () => {
   const [world, setWorld] = useState<GameWorld | null>(null);
   const [player, setPlayer] = useState<Entity | null>(null);
   const [entities, setEntities] = useState<Entity[]>([]);
-  const [gameState, setGameState] = useState<GameState>(GameState.EXPLORATION);
   const [logs, setLogs] = useState<LogMessage[]>([]);
+  const [gameState, setGameState] = useState<GameState>(GameState.EXPLORATION);
   const [activeEntityId, setActiveEntityId] = useState<string | null>(null);
+  const prevActiveEntityIdRef = useRef<string | null>(null);
 
   // UI State
   const [selectedTargetEntityId, setSelectedTargetEntityId] = useState<
@@ -69,6 +74,29 @@ const App: React.FC = () => {
   const containerRef = useRef<HTMLDivElement>(null);
 
   const followInitializedRef = useRef(false);
+
+  // UI Settings
+  const [splashNotificationsEnabled, setSplashNotificationsEnabled] = useState(
+    () => {
+      const saved = localStorage.getItem("splashNotificationsEnabled");
+      const value = saved !== null ? JSON.parse(saved) : true;
+      console.log("Initial splash notifications state:", value);
+      return value;
+    },
+  );
+
+  // Splash Notifications
+  const {
+    notifications: splashNotifications,
+    showNotification: showSplashNotification,
+    removeNotification: removeSplashNotification,
+  } = useSplashNotifications();
+
+  const handleToggleSplashNotifications = useCallback((enabled: boolean) => {
+    console.log("Toggle splash notifications:", enabled);
+    setSplashNotificationsEnabled(enabled);
+    localStorage.setItem("splashNotificationsEnabled", JSON.stringify(enabled));
+  }, []);
 
   // Pathfinding state
   const [pathfindingTarget, setPathfindingTarget] = useState<Position | null>(
@@ -994,6 +1022,25 @@ const App: React.FC = () => {
     dimensionsUpdateTrigger,
   ]);
 
+  // Show "Ваш ход" notification when turn changes to player
+  useEffect(() => {
+    if (
+      splashNotificationsEnabled &&
+      activeEntityId &&
+      player &&
+      activeEntityId === player.id &&
+      prevActiveEntityIdRef.current !== player.id
+    ) {
+      showSplashNotification("Ваш ход");
+    }
+    prevActiveEntityIdRef.current = activeEntityId;
+  }, [
+    activeEntityId,
+    player,
+    showSplashNotification,
+    splashNotificationsEnabled,
+  ]);
+
   if (!world || !player) {
     return <div className="text-white p-10">Connecting to server...</div>;
   }
@@ -1127,6 +1174,8 @@ const App: React.FC = () => {
           onGoToEntity={handleGoToEntity}
           onSendCommand={sendTextCommand}
           onContextMenu={handleContextMenu}
+          splashNotificationsEnabled={splashNotificationsEnabled}
+          onToggleSplashNotifications={handleToggleSplashNotifications}
         />
       </WindowManagerProvider>
 
@@ -1141,6 +1190,15 @@ const App: React.FC = () => {
           onGoToPathfinding={handleGoToPathfinding}
         />
       )}
+
+      {/* Splash Notifications */}
+      {splashNotifications.map((notification) => (
+        <SplashNotification
+          key={notification.id}
+          notification={notification}
+          onComplete={removeSplashNotification}
+        />
+      ))}
     </div>
   );
 };

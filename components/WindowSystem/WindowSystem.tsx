@@ -32,6 +32,8 @@ interface WindowSystemProps {
   onGoToEntity?: (entityId: string) => void;
   onSendCommand?: (text: string, type: "SAY" | "WHISPER" | "YELL") => void;
   onContextMenu?: (data: ContextMenuData) => void;
+  splashNotificationsEnabled: boolean;
+  onToggleSplashNotifications: (enabled: boolean) => void;
 }
 
 const WindowSystem: FC<WindowSystemProps> = ({
@@ -45,6 +47,8 @@ const WindowSystem: FC<WindowSystemProps> = ({
   onGoToEntity,
   onSendCommand,
   onContextMenu,
+  splashNotificationsEnabled,
+  onToggleSplashNotifications,
 }) => {
   const {
     windows,
@@ -78,6 +82,8 @@ const WindowSystem: FC<WindowSystemProps> = ({
           keyBindingManager,
           resetWindowLayout,
           onOpenCasino: handleOpenCasino,
+          splashNotificationsEnabled,
+          onToggleSplashNotifications,
         }),
       );
 
@@ -158,6 +164,25 @@ const WindowSystem: FC<WindowSystemProps> = ({
     onEntityClick,
     updateWindowContent,
     onContextMenu,
+  ]);
+
+  // Update Settings window content when splash notifications setting changes
+  useEffect(() => {
+    const settingsConfig = createSettingsWindowConfig({
+      keyBindingManager,
+      resetWindowLayout,
+      onOpenCasino: handleOpenCasino,
+      splashNotificationsEnabled,
+      onToggleSplashNotifications,
+    });
+    updateWindowContent(SETTINGS_WINDOW_ID, settingsConfig.content);
+  }, [
+    splashNotificationsEnabled,
+    onToggleSplashNotifications,
+    keyBindingManager,
+    resetWindowLayout,
+    handleOpenCasino,
+    updateWindowContent,
   ]);
 
   // Update TurnOrderWindow content when entities or turn data changes

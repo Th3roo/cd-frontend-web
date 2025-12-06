@@ -11,12 +11,16 @@ interface SettingsWindowOptions {
   keyBindingManager: KeyBindingManager;
   resetWindowLayout: () => Promise<void>;
   onOpenCasino: () => void;
+  splashNotificationsEnabled: boolean;
+  onToggleSplashNotifications: (enabled: boolean) => void;
 }
 
 export const createSettingsWindowConfig = ({
   keyBindingManager,
   resetWindowLayout,
   onOpenCasino,
+  splashNotificationsEnabled,
+  onToggleSplashNotifications,
 }: SettingsWindowOptions): WindowConfig => ({
   id: SETTINGS_WINDOW_ID,
   title: "Settings",
@@ -32,6 +36,8 @@ export const createSettingsWindowConfig = ({
       keyBindingManager={keyBindingManager}
       resetWindowLayout={resetWindowLayout}
       onOpenCasino={onOpenCasino}
+      splashNotificationsEnabled={splashNotificationsEnabled}
+      onToggleSplashNotifications={onToggleSplashNotifications}
     />
   ),
 });
