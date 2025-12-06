@@ -8,7 +8,7 @@ const CasinoWindow: FC<CasinoWindowProps> = ({ onClose }) => {
   const [progress, setProgress] = useState(0);
   const [isLoading, setIsLoading] = useState(false);
   const [winnings, setWinnings] = useState(12050);
-  const [total, setTotal] = useState(70055020);
+  const [total] = useState(70055020);
   const [percentage, setPercentage] = useState(14);
   const [baseWinnings] = useState(12050);
   const [baseTotal] = useState(70055020);

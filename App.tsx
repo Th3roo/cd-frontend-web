@@ -74,6 +74,10 @@ const App: React.FC = () => {
   const [waitingForMoveResponse, setWaitingForMoveResponse] = useState(false);
   const pathfindingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const lastCommandedPosRef = useRef<Position | null>(null);
+  const [containerDimensions, setContainerDimensions] = useState({
+    width: 800,
+    height: 600,
+  });
 
   // Единый регистр всех сущностей (включая игрока)
   const entityRegistry = useMemo(() => {
@@ -372,19 +376,19 @@ const App: React.FC = () => {
 
       sendCommand("MOVE", { dx, dy }, `переместились на (${x}, ${y})`);
     },
-    [player, sendCommand, activeEntityId, entityRegistry],
+    [player, sendCommand, activeEntityId, addLog],
   );
 
   const handleSelectEntity = useCallback((entityId: string | null) => {
     setSelectedTargetEntityId(entityId);
-    if (entityId) {
-      console.log("Выбрана сущность:", entityId);
-    }
+    // eslint-disable-next-line no-console
+    console.log("Selected entity:", entityId);
   }, []);
 
   const handleSelectPosition = useCallback((x: number, y: number) => {
     setSelectedTargetPosition({ x, y });
-    console.log("Выбрана позиция:", x, y);
+    // eslint-disable-next-line no-console
+    console.log("Selected position:", x, y);
   }, []);
 
   const handleGoToPosition = useCallback(
@@ -422,18 +426,19 @@ const App: React.FC = () => {
       // Отключаем следование и перемещаем камеру к сущности
       setFollowedEntityId(null);
 
-      if (containerRef.current && world) {
-        const containerWidth = containerRef.current.clientWidth;
-        const containerHeight = containerRef.current.clientHeight;
+      if (world) {
         const CELL_SIZE = 50 * zoom;
+
         const entityPixelX = entity.pos.x * CELL_SIZE + CELL_SIZE / 2;
         const entityPixelY = entity.pos.y * CELL_SIZE + CELL_SIZE / 2;
-        const offsetX = containerWidth / 2 - entityPixelX;
-        const offsetY = containerHeight / 2 - entityPixelY;
+
+        const offsetX = containerDimensions.width / 2 - entityPixelX;
+        const offsetY = containerDimensions.height / 2 - entityPixelY;
+
         setPanOffset({ x: offsetX, y: offsetY });
       }
     },
-    [entityRegistry, world, zoom],
+    [entityRegistry, world, zoom, containerDimensions, addLog, activeEntityId],
   );
 
   const handleGoToPathfinding = useCallback(
@@ -444,8 +449,6 @@ const App: React.FC = () => {
 
       // Check if it's player's turn
       if (activeEntityId && activeEntityId !== player.id) {
-        const activeEntity = entityRegistry.get(activeEntityId);
-        const activeName = activeEntity?.name || "Unknown";
         // Silently block pathfinding when not player's turn
         return;
       }
@@ -546,6 +549,7 @@ const App: React.FC = () => {
     waitingForMoveResponse,
     player?.pos.x,
     player?.pos.y,
+    player,
     world,
     sendCommand,
     activeEntityId,
@@ -600,7 +604,14 @@ const App: React.FC = () => {
         lastCommandedPosRef.current = null;
       }
     }
-  }, [player?.pos.x, player?.pos.y, waitingForMoveResponse, currentPath]);
+  }, [
+    player?.pos.x,
+    player?.pos.y,
+    player,
+    waitingForMoveResponse,
+    currentPath,
+    addLog,
+  ]);
 
   // Stop pathfinding when reached target
   useEffect(() => {
@@ -623,7 +634,14 @@ const App: React.FC = () => {
       setCurrentPath([]);
       setPathfindingTarget(null);
     }
-  }, [player?.pos.x, player?.pos.y, isPathfinding, pathfindingTarget]);
+  }, [
+    player?.pos.x,
+    player?.pos.y,
+    player,
+    isPathfinding,
+    pathfindingTarget,
+    addLog,
+  ]);
 
   // Cleanup pathfinding timeout on unmount
   useEffect(() => {
@@ -847,34 +865,53 @@ const App: React.FC = () => {
     }
   }, [entityRegistry, followedEntityId, playerPosKey]);
 
+  // Update container dimensions when they change
+  useEffect(() => {
+    const updateDimensions = () => {
+      if (containerRef.current) {
+        setContainerDimensions({
+          width: containerRef.current.clientWidth,
+          height: containerRef.current.clientHeight,
+        });
+      }
+    };
+
+    updateDimensions();
+    window.addEventListener("resize", updateDimensions);
+    return () => window.removeEventListener("resize", updateDimensions);
+  }, []);
+
   // Вычисляем offset для центрирования на отслеживаемой сущности
-  const cameraOffset =
-    followedEntityId && containerRef.current && world && player
-      ? (() => {
-          // Определяем, за какой сущностью следим
-          const followedEntity = entityRegistry.get(followedEntityId);
+  const cameraOffset = useMemo(() => {
+    if (!followedEntityId || !world || !player) {
+      return panOffset;
+    }
 
-          if (!followedEntity) {
-            return panOffset;
-          }
+    const followedEntity = entityRegistry.get(followedEntityId);
+    if (!followedEntity) {
+      return panOffset;
+    }
 
-          const container = containerRef.current;
-          const containerWidth = container.clientWidth;
-          const containerHeight = container.clientHeight;
+    const CELL_SIZE = 50 * zoom;
 
-          const CELL_SIZE = 50 * zoom;
+    // Позиция отслеживаемой сущности в пикселях относительно сетки
+    const entityPixelX = followedEntity.pos.x * CELL_SIZE + CELL_SIZE / 2;
+    const entityPixelY = followedEntity.pos.y * CELL_SIZE + CELL_SIZE / 2;
 
-          // Позиция отслеживаемой сущности в пикселях относительно сетки
-          const entityPixelX = followedEntity.pos.x * CELL_SIZE + CELL_SIZE / 2;
-          const entityPixelY = followedEntity.pos.y * CELL_SIZE + CELL_SIZE / 2;
+    // Вычисляем offset, чтобы сущность была в центре контейнера
+    const offsetX = containerDimensions.width / 2 - entityPixelX;
+    const offsetY = containerDimensions.height / 2 - entityPixelY;
 
-          // Вычисляем offset, чтобы сущность была в центре контейнера
-          const offsetX = containerWidth / 2 - entityPixelX;
-          const offsetY = containerHeight / 2 - entityPixelY;
-
-          return { x: offsetX, y: offsetY };
-        })()
-      : panOffset;
+    return { x: offsetX, y: offsetY };
+  }, [
+    followedEntityId,
+    world,
+    player,
+    entityRegistry,
+    panOffset,
+    zoom,
+    containerDimensions,
+  ]);
 
   if (!world || !player) {
     return <div className="text-white p-10">Connecting to server...</div>;
