@@ -839,7 +839,17 @@ const App: React.FC = () => {
         e.preventDefault();
 
         setZoom((prevZoom) => {
-          const delta = e.deltaY > 0 ? -ZOOM_STEP : ZOOM_STEP;
+          // Поддержка pinch-to-zoom на тачпадах (ctrlKey + wheel)
+          // На Mac trackpad pinch gesture генерирует wheel event с ctrlKey
+          let delta: number;
+          if (e.ctrlKey) {
+            // Для pinch gesture используем более точное значение deltaY
+            // Обычно deltaY при pinch меньше, поэтому делим на 100
+            delta = -e.deltaY / 100;
+          } else {
+            // Обычное колесико мыши
+            delta = e.deltaY > 0 ? -ZOOM_STEP : ZOOM_STEP;
+          }
           return Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, prevZoom + delta));
         });
       }
