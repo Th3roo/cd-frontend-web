@@ -15,3 +15,7 @@ export {
   CASINO_WINDOW_ID,
   createCasinoWindowConfig,
 } from "./CasinoWindowConfig";
+export {
+  GAME_LOG_WINDOW_ID,
+  createGameLogWindowConfig,
+} from "./GameLogWindowConfig";

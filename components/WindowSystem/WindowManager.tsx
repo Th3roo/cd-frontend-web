@@ -424,6 +424,7 @@ export const WindowManagerProvider: FC<WindowManagerProviderProps> = ({
           id: config.id,
           title: config.title,
           isMinimized,
+          minimizeBehavior: config.minimizeBehavior,
           isFocused: true,
           position: clampedPosition,
           size,

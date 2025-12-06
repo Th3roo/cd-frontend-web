@@ -1,11 +1,30 @@
-import { useRef, useState, useEffect, FC, useCallback } from "react";
+import {
+  useRef,
+  useState,
+  useEffect,
+  FC,
+  useCallback,
+  createContext,
+  useContext,
+} from "react";
 
-import { WindowState, DockedPosition } from "./types";
+import { WindowState, DockedPosition, MinimizeBehavior } from "./types";
 import { useWindowManager } from "./WindowManager";
 
 interface WindowProps {
   window: WindowState;
 }
+
+interface WindowContextType {
+  isMinimized: boolean;
+  minimizeBehavior?: MinimizeBehavior;
+}
+
+export const WindowContext = createContext<WindowContextType>({
+  isMinimized: false,
+});
+
+export const useWindowContext = () => useContext(WindowContext);
 
 const Window: FC<WindowProps> = ({ window }) => {
   const {
@@ -280,12 +299,17 @@ const Window: FC<WindowProps> = ({ window }) => {
     window.resizableY,
   ]);
 
-  if (window.isMinimized) {
+  if (window.isMinimized && window.minimizeBehavior !== "collapse") {
     return null;
   }
 
   return (
-    <>
+    <WindowContext.Provider
+      value={{
+        isMinimized: window.isMinimized,
+        minimizeBehavior: window.minimizeBehavior,
+      }}
+    >
       {isDragging && snapZone !== "none" && (
         <div className="fixed inset-0 pointer-events-none z-[9998]">
           {snapZone === "left" && (
@@ -335,17 +359,29 @@ const Window: FC<WindowProps> = ({ window }) => {
         className={`absolute overflow-hidden transition-all ${
           window.docked !== "none" ? "duration-300" : "duration-0"
         } ${
-          window.decorated
-            ? `bg-neutral-900 border rounded-lg shadow-2xl ${
-                window.isFocused ? "border-gray-500" : "border-neutral-700"
-              }`
-            : "bg-transparent"
+          window.isMinimized && window.minimizeBehavior === "collapse"
+            ? "bg-black/40 rounded-lg backdrop-blur-sm border border-neutral-700/50"
+            : window.decorated
+              ? `bg-neutral-900 border rounded-lg shadow-2xl ${
+                  window.isFocused ? "border-gray-500" : "border-neutral-700"
+                }`
+              : "bg-transparent"
         }`}
         style={{
           left: `${window.position.x}px`,
-          top: `${window.position.y}px`,
+          top:
+            window.isMinimized && window.minimizeBehavior === "collapse"
+              ? "auto"
+              : `${window.position.y}px`,
+          bottom:
+            window.isMinimized && window.minimizeBehavior === "collapse"
+              ? `${globalThis.innerHeight - (window.position.y + window.size.height)}px`
+              : "auto",
           width: `${window.size.width}px`,
-          height: `${window.size.height}px`,
+          height:
+            window.isMinimized && window.minimizeBehavior === "collapse"
+              ? "auto"
+              : `${window.size.height}px`,
           zIndex: window.zIndex,
           cursor: isDragging
             ? "grabbing"
@@ -362,98 +398,104 @@ const Window: FC<WindowProps> = ({ window }) => {
         }}
       >
         {/* Заголовок окна (только если decorated === true) */}
-        {window.decorated && (
-          <div
-            data-window-header
-            className={`flex items-center justify-between px-3 py-2 border-b select-none ${
-              window.isFocused
-                ? "bg-neutral-800 border-neutral-700"
-                : "bg-neutral-850 border-neutral-750"
-            }`}
-            onMouseDown={handleMouseDown}
-            style={{ cursor: isDragging ? "grabbing" : "grab" }}
-          >
-            <span className="text-sm font-medium text-gray-300">
-              {window.title}
-            </span>
-            <div className="flex items-center gap-1">
-              {/* Кнопка свернуть (только если minimizable === true) */}
-              {window.minimizable && (
-                <button
-                  onClick={() => minimizeWindow(window.id)}
-                  className="w-6 h-6 flex items-center justify-center rounded hover:bg-neutral-700 transition-colors"
-                  title="Minimize"
-                >
-                  <svg
-                    className="w-3 h-3 text-gray-400"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
+        {window.decorated &&
+          !(window.isMinimized && window.minimizeBehavior === "collapse") && (
+            <div
+              data-window-header
+              className={`flex items-center justify-between px-3 py-2 border-b select-none ${
+                window.isFocused
+                  ? "bg-neutral-800 border-neutral-700"
+                  : "bg-neutral-850 border-neutral-750"
+              }`}
+              onMouseDown={handleMouseDown}
+              style={{ cursor: isDragging ? "grabbing" : "grab" }}
+            >
+              <span className="text-sm font-medium text-gray-300">
+                {window.title}
+              </span>
+              <div className="flex items-center gap-1">
+                {/* Кнопка свернуть (только если minimizable === true) */}
+                {window.minimizable && (
+                  <button
+                    onClick={() => minimizeWindow(window.id)}
+                    className="w-6 h-6 flex items-center justify-center rounded hover:bg-neutral-700 transition-colors"
+                    title="Minimize"
                   >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M20 12H4"
-                    />
-                  </svg>
-                </button>
-              )}
-              {/* Кнопка закрыть (только если closeable === true) */}
-              {window.closeable && (
-                <button
-                  onClick={() => closeWindow(window.id)}
-                  className="w-6 h-6 flex items-center justify-center rounded hover:bg-red-600 transition-colors"
-                  title="Close"
-                >
-                  <svg
-                    className="w-3 h-3 text-gray-400"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
+                    <svg
+                      className="w-3 h-3 text-gray-400"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M20 12H4"
+                      />
+                    </svg>
+                  </button>
+                )}
+                {/* Кнопка закрыть (только если closeable === true) */}
+                {window.closeable && (
+                  <button
+                    onClick={() => closeWindow(window.id)}
+                    className="w-6 h-6 flex items-center justify-center rounded hover:bg-red-600 transition-colors"
+                    title="Close"
                   >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M6 18L18 6M6 6l12 12"
-                    />
-                  </svg>
-                </button>
-              )}
+                    <svg
+                      className="w-3 h-3 text-gray-400"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M6 18L18 6M6 6l12 12"
+                      />
+                    </svg>
+                  </button>
+                )}
+              </div>
             </div>
-          </div>
-        )}
+          )}
 
         {/* Содержимое окна */}
         <div
           className={`w-full overflow-auto ${
-            window.decorated ? "h-[calc(100%-40px)] bg-neutral-900" : "h-full"
+            window.isMinimized && window.minimizeBehavior === "collapse"
+              ? "h-auto bg-transparent"
+              : window.decorated
+                ? "h-[calc(100%-40px)] bg-neutral-900"
+                : "h-full"
           }`}
         >
           {window.content}
         </div>
 
         {/* Resize handle (только если resizable или resizableX/resizableY === true) */}
-        {(window.resizable || window.resizableX || window.resizableY) && (
-          <div
-            onMouseDown={handleResizeMouseDown}
-            className={`absolute bottom-0 right-0 w-5 h-5 group ${
-              window.resizableX && window.resizableY
-                ? "cursor-nwse-resize"
-                : window.resizableX
-                  ? "cursor-ew-resize"
-                  : "cursor-ns-resize"
-            }`}
-            style={{ zIndex: 10 }}
-            title="Изменить размер"
-          >
-            <div className="absolute bottom-1 right-1 w-4 h-4 border-r-2 border-b-2 border-gray-500 group-hover:border-gray-300 transition-colors opacity-60 group-hover:opacity-100" />
-            <div className="absolute bottom-2 right-2 w-2 h-2 border-r-2 border-b-2 border-gray-500 group-hover:border-gray-300 transition-colors opacity-40 group-hover:opacity-80" />
-          </div>
-        )}
+        {!window.isMinimized &&
+          (window.resizable || window.resizableX || window.resizableY) && (
+            <div
+              onMouseDown={handleResizeMouseDown}
+              className={`absolute bottom-0 right-0 w-5 h-5 group ${
+                window.resizableX && window.resizableY
+                  ? "cursor-nwse-resize"
+                  : window.resizableX
+                    ? "cursor-ew-resize"
+                    : "cursor-ns-resize"
+              }`}
+              style={{ zIndex: 10 }}
+              title="Изменить размер"
+            >
+              <div className="absolute bottom-1 right-1 w-4 h-4 border-r-2 border-b-2 border-gray-500 group-hover:border-gray-300 transition-colors opacity-60 group-hover:opacity-100" />
+              <div className="absolute bottom-2 right-2 w-2 h-2 border-r-2 border-b-2 border-gray-500 group-hover:border-gray-300 transition-colors opacity-40 group-hover:opacity-80" />
+            </div>
+          )}
       </div>
-    </>
+    </WindowContext.Provider>
   );
 };
 

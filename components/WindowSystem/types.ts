@@ -10,6 +10,8 @@ export interface WindowSize {
 
 export type DockedPosition = "none" | "left" | "right";
 
+export type MinimizeBehavior = "hide" | "collapse";
+
 export interface MagneticSnap {
   left?: boolean;
   right?: boolean;
@@ -30,6 +32,7 @@ export interface WindowState {
   id: string;
   title: string;
   isMinimized: boolean;
+  minimizeBehavior?: MinimizeBehavior;
   isFocused: boolean;
   position: WindowPosition;
   size: WindowSize;
@@ -55,6 +58,7 @@ export interface WindowState {
 export interface WindowConfig {
   id: string;
   title: string;
+  minimizeBehavior?: MinimizeBehavior;
   closeable?: boolean;
   minimizable?: boolean;
   resizable?: boolean;

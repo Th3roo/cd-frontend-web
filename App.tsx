@@ -14,9 +14,8 @@ import {
   DEFAULT_KEY_BINDINGS,
 } from "./commands";
 import GameGrid from "./components/GameGrid";
-import GameLog from "./components/GameLog";
 import StatusPanel from "./components/StatusPanel";
-import { WindowSystem } from "./components/WindowSystem";
+import { WindowManagerProvider, WindowSystem } from "./components/WindowSystem";
 import {
   GameWorld,
   Entity,
@@ -49,7 +48,6 @@ const App: React.FC = () => {
   const [activeEntityId, setActiveEntityId] = useState<string | null>(null);
 
   // UI State
-  const [commandInput, setCommandInput] = useState("");
   const [selectedTargetEntityId, setSelectedTargetEntityId] = useState<
     string | null
   >(null);
@@ -61,7 +59,6 @@ const App: React.FC = () => {
   const [panOffset, setPanOffset] = useState({ x: 0, y: 0 });
   const [followedEntityId, setFollowedEntityId] = useState<string | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
-  const commandInputRef = useRef<HTMLInputElement>(null);
 
   const followInitializedRef = useRef(false);
 
@@ -349,15 +346,17 @@ const App: React.FC = () => {
     [entityRegistry, player, activeEntityId, addLog],
   );
 
-  const sendTextCommand = (text: string) => {
-    const trimmed = text.trim();
-    if (!trimmed) {
-      return;
-    }
+  const sendTextCommand = useCallback(
+    (text: string, type: "SAY" | "WHISPER" | "YELL" = "SAY") => {
+      const trimmed = text.trim();
+      if (!trimmed) {
+        return;
+      }
 
-    sendCommand("TEXT", { text: trimmed });
-    setCommandInput("");
-  };
+      sendCommand("TEXT", { text: trimmed, type });
+    },
+    [sendCommand],
+  );
 
   const handleMovePlayer = useCallback(
     (x: number, y: number) => {
@@ -666,16 +665,6 @@ const App: React.FC = () => {
       lastCommandedPosRef.current = null;
     };
   }, []);
-
-  // --- UI Handlers ---
-  const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === "Enter") {
-      sendTextCommand(commandInput);
-    } else if (e.key === "Escape") {
-      // Убираем фокус с поля ввода при нажатии Escape
-      commandInputRef.current?.blur();
-    }
-  };
 
   // Global key handler for game controls
   useEffect(() => {
@@ -1040,42 +1029,21 @@ const App: React.FC = () => {
             </div>
           </div>
         </div>
-        <div className="w-[450px] flex flex-col bg-neutral-900">
-          <div className="flex-1 overflow-hidden relative">
-            <GameLog
-              logs={logs}
-              onGoToPosition={handleGoToPosition}
-              onGoToEntity={handleGoToEntity}
-            />
-          </div>
-          <div className="p-3 bg-neutral-950 border-t border-neutral-800">
-            <div className="flex items-center gap-2">
-              <span className="text-cyan-500 font-bold">{">"}</span>
-              <input
-                ref={commandInputRef}
-                type="text"
-                value={commandInput}
-                onChange={(e) => setCommandInput(e.target.value)}
-                onKeyDown={handleKeyDown}
-                placeholder="Enter command..."
-                className="flex-1 bg-transparent border-none outline-none text-gray-200 placeholder-gray-700"
-              />
-            </div>
-            <div className="text-[10px] text-gray-600 mt-1 flex justify-between">
-              <span>{world.level === 0 ? "Town" : `Level ${world.level}`}</span>
-            </div>
-          </div>
-        </div>
       </div>
 
-      {/* Window System */}
-      <WindowSystem
-        keyBindingManager={keyBindingManager}
-        entities={player ? [player, ...entities] : entities}
-        activeEntityId={activeEntityId}
-        playerId={player?.id || null}
-        onEntityClick={handleGoToEntity}
-      />
+      <WindowManagerProvider>
+        <WindowSystem
+          keyBindingManager={keyBindingManager}
+          entities={entities}
+          activeEntityId={activeEntityId}
+          playerId={player.id}
+          onEntityClick={handleGoToEntity}
+          logs={logs}
+          onGoToPosition={handleGoToPosition}
+          onGoToEntity={handleGoToEntity}
+          onSendCommand={sendTextCommand}
+        />
+      </WindowManagerProvider>
     </div>
   );
 };

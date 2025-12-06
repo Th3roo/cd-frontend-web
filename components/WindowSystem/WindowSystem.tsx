@@ -1,7 +1,7 @@
 import { FC, useEffect, useRef, useCallback } from "react";
 
 import { KeyBindingManager } from "../../commands";
-import { Entity } from "../../types";
+import { Entity, LogMessage, Position } from "../../types";
 
 import { getStoredWindowState } from "./utils";
 import Window from "./Window";
@@ -17,6 +17,8 @@ import {
   createTurnOrderWindowConfig,
   CASINO_WINDOW_ID,
   createCasinoWindowConfig,
+  GAME_LOG_WINDOW_ID,
+  createGameLogWindowConfig,
 } from "./windows";
 
 interface WindowSystemProps {
@@ -25,6 +27,10 @@ interface WindowSystemProps {
   activeEntityId?: string | null;
   playerId?: string | null;
   onEntityClick?: (entityId: string) => void;
+  logs?: LogMessage[];
+  onGoToPosition?: (position: Position) => void;
+  onGoToEntity?: (entityId: string) => void;
+  onSendCommand?: (text: string, type: "SAY" | "WHISPER" | "YELL") => void;
 }
 
 const WindowSystem: FC<WindowSystemProps> = ({
@@ -33,6 +39,10 @@ const WindowSystem: FC<WindowSystemProps> = ({
   activeEntityId = null,
   playerId = null,
   onEntityClick,
+  logs = [],
+  onGoToPosition,
+  onGoToEntity,
+  onSendCommand,
 }) => {
   const {
     windows,
@@ -77,6 +87,18 @@ const WindowSystem: FC<WindowSystemProps> = ({
       }
     }
 
+    const gameLogExists = windows.some((w) => w.id === GAME_LOG_WINDOW_ID);
+    if (!gameLogExists) {
+      openWindow(
+        createGameLogWindowConfig({
+          logs,
+          onGoToPosition,
+          onGoToEntity,
+          onSendCommand,
+        }),
+      );
+    }
+
     const turnOrderBarExists = windows.some(
       (w) => w.id === TURN_ORDER_BAR_WINDOW_ID,
     );
@@ -107,6 +129,10 @@ const WindowSystem: FC<WindowSystemProps> = ({
     handleOpenCasino,
     keyBindingManager,
     resetWindowLayout,
+    logs,
+    onGoToPosition,
+    onGoToEntity,
+    onSendCommand,
   ]);
 
   // Update TurnOrderBar content when entities or turn data changes
@@ -133,6 +159,17 @@ const WindowSystem: FC<WindowSystemProps> = ({
       updateWindowContent(TURN_ORDER_WINDOW_ID, orderConfig.content);
     }
   }, [entities, activeEntityId, playerId, updateWindowContent]);
+
+  // Update GameLogWindow content when logs change
+  useEffect(() => {
+    const logConfig = createGameLogWindowConfig({
+      logs,
+      onGoToPosition,
+      onGoToEntity,
+      onSendCommand,
+    });
+    updateWindowContent(GAME_LOG_WINDOW_ID, logConfig.content);
+  }, [logs, onGoToPosition, onGoToEntity, onSendCommand, updateWindowContent]);
 
   return (
     <>
