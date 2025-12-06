@@ -405,6 +405,7 @@ const GameGrid: FC<GameGridProps> = ({
         style={{
           width: world.width * CELL_SIZE,
           height: world.height * CELL_SIZE,
+          transform: `translate(-${Math.max(2, zoom * 2)}px, -${Math.max(2, zoom * 2)}px)`,
         }}
       >
         {entities
