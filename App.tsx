@@ -1,6 +1,5 @@
-import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { Focus, Navigation } from "lucide-react";
-import { WindowSystem } from "./components/WindowSystem";
+import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 
 import {
   CommandAttack,
@@ -17,6 +16,7 @@ import {
 import GameGrid from "./components/GameGrid";
 import GameLog from "./components/GameLog";
 import StatusPanel from "./components/StatusPanel";
+import { WindowSystem } from "./components/WindowSystem";
 import {
   GameWorld,
   Entity,
@@ -412,7 +412,9 @@ const App: React.FC = () => {
   const handleGoToEntity = useCallback(
     (entityId: string) => {
       const entity = entityRegistry.get(entityId);
-      if (!entity) return;
+      if (!entity) {
+        return;
+      }
 
       // Выделяем сущность как цель
       setSelectedTargetEntityId(entityId);
@@ -437,7 +439,9 @@ const App: React.FC = () => {
 
   const handleGoToPathfinding = useCallback(
     (targetPos: Position) => {
-      if (!player || !world) return;
+      if (!player || !world) {
+        return;
+      }
 
       // Check if it's player's turn
       if (activeEntityId && activeEntityId !== player.id) {
@@ -601,7 +605,9 @@ const App: React.FC = () => {
 
   // Stop pathfinding when reached target
   useEffect(() => {
-    if (!isPathfinding || !player || !pathfindingTarget) return;
+    if (!isPathfinding || !player || !pathfindingTarget) {
+      return;
+    }
 
     if (
       player.pos.x === pathfindingTarget.x &&
@@ -700,7 +706,9 @@ const App: React.FC = () => {
   // Обработка зума колесиком мыши
   useEffect(() => {
     const handleWheel = (e: WheelEvent) => {
-      if (!containerRef.current) return;
+      if (!containerRef.current) {
+        return;
+      }
 
       const rect = containerRef.current.getBoundingClientRect();
       if (
@@ -847,7 +855,7 @@ const App: React.FC = () => {
           // Определяем, за какой сущностью следим
           const followedEntity = entityRegistry.get(followedEntityId);
 
-          if (!followedEntity) return panOffset;
+          if (!followedEntity) {return panOffset;}
 
           const container = containerRef.current;
           const containerWidth = container.clientWidth;

@@ -23,7 +23,9 @@ function getNeighbors(pos: Position, world: GameWorld): Position[] {
 
   for (let dx = -1; dx <= 1; dx++) {
     for (let dy = -1; dy <= 1; dy++) {
-      if (dx === 0 && dy === 0) continue; // Skip current position
+      if (dx === 0 && dy === 0) {
+        continue;
+      } // Skip current position
 
       const newX = pos.x + dx;
       const newY = pos.y + dy;
@@ -56,7 +58,7 @@ function getNeighbors(pos: Position, world: GameWorld): Position[] {
 export function findPath(
   start: Position,
   goal: Position,
-  world: GameWorld
+  world: GameWorld,
 ): Position[] | null {
   // Early return if start equals goal
   if (start.x === goal.x && start.y === goal.y) {
@@ -135,7 +137,7 @@ export function findPath(
 
       // Check if neighbor is already in open set
       const existingIndex = openSet.findIndex(
-        (n) => n.pos.x === neighborPos.x && n.pos.y === neighborPos.y
+        (n) => n.pos.x === neighborPos.x && n.pos.y === neighborPos.y,
       );
 
       if (existingIndex !== -1) {
@@ -165,7 +167,9 @@ export function findPath(
 /**
  * Convert a path into movement commands (dx, dy)
  */
-export function pathToCommands(path: Position[]): Array<{ dx: number; dy: number }> {
+export function pathToCommands(
+  path: Position[],
+): Array<{ dx: number; dy: number }> {
   const commands: Array<{ dx: number; dy: number }> = [];
 
   for (let i = 0; i < path.length - 1; i++) {

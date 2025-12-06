@@ -55,7 +55,7 @@ const Window: FC<WindowProps> = ({ window }) => {
   };
 
   const detectSnapZone = (mouseX: number, mouseY: number): DockedPosition => {
-    if (!window.dockable) return "none";
+    if (!window.dockable) {return "none";}
 
     const viewportWidth = globalThis.innerWidth;
 
@@ -72,7 +72,7 @@ const Window: FC<WindowProps> = ({ window }) => {
     x: number,
     y: number,
   ): { x: number; y: number } => {
-    if (!window.dockable) return { x, y };
+    if (!window.dockable) {return { x, y };}
 
     let newX = x;
     let newY = y;
@@ -105,7 +105,7 @@ const Window: FC<WindowProps> = ({ window }) => {
 
     // Snap to other windows
     windows.forEach((otherWindow) => {
-      if (otherWindow.id === window.id || otherWindow.isMinimized) return;
+      if (otherWindow.id === window.id || otherWindow.isMinimized) {return;}
 
       const otherRight = otherWindow.position.x + otherWindow.size.width;
       const otherBottom = otherWindow.position.y + otherWindow.size.height;
@@ -167,8 +167,8 @@ const Window: FC<WindowProps> = ({ window }) => {
     }
 
     const handleMouseMove = (e: MouseEvent) => {
-      let newX = e.clientX - dragOffset.x;
-      let newY = e.clientY - dragOffset.y;
+      const newX = e.clientX - dragOffset.x;
+      const newY = e.clientY - dragOffset.y;
 
       const zone = detectSnapZone(e.clientX, e.clientY);
       setSnapZone(zone);

@@ -1,4 +1,5 @@
 import React, { useRef, useEffect, useState } from "react";
+
 import { Entity } from "../../../../types";
 
 interface TurnOrderBarProps {
@@ -27,7 +28,7 @@ export const TurnOrderBar: React.FC<TurnOrderBarProps> = ({
 
   // Smart scrolling: only scroll if active card is not visible
   useEffect(() => {
-    if (activeIndex < 0 || !containerRef.current) return;
+    if (activeIndex < 0 || !containerRef.current) {return;}
 
     const CARD_WIDTH = 40;
     const GAP = 8;

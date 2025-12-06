@@ -1,8 +1,11 @@
 import { FC, useEffect, useRef } from "react";
 
-import { useWindowManager } from "./WindowManager";
+import { KeyBindingManager } from "../../commands";
+import { Entity } from "../../types";
+
 import { getStoredWindowState } from "./utils";
 import Window from "./Window";
+import { useWindowManager } from "./WindowManager";
 import {
   DOCK_WINDOW_ID,
   createDockWindowConfig,
@@ -15,8 +18,7 @@ import {
   CASINO_WINDOW_ID,
   createCasinoWindowConfig,
 } from "./windows";
-import { KeyBindingManager } from "../../commands";
-import { Entity } from "../../types";
+
 
 interface WindowSystemProps {
   keyBindingManager: KeyBindingManager;

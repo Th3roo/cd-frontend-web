@@ -1,6 +1,7 @@
-import React from "react";
-import { Entity } from "../../../../types";
 import { Users, Sword, User, Heart, Zap, Coins, Shield } from "lucide-react";
+import React from "react";
+
+import { Entity } from "../../../../types";
 
 interface TurnOrderWindowProps {
   entities: Entity[];
@@ -29,17 +30,17 @@ export const TurnOrderWindow: React.FC<TurnOrderWindowProps> = ({
   };
 
   const getEntityTypeLabel = (entity: Entity) => {
-    if (entity.id === playerId) return "Player";
-    if (entity.isHostile) return "Hostile";
-    if (entity.npcType) return entity.npcType;
+    if (entity.id === playerId) {return "Player";}
+    if (entity.isHostile) {return "Hostile";}
+    if (entity.npcType) {return entity.npcType;}
     return "NPC";
   };
 
   const getStatusClass = (entity: Entity) => {
-    if (entity.isDead) return "text-gray-500";
-    if (entity.id === activeEntityId) return "text-cyan-400";
-    if (entity.id === playerId) return "text-blue-400";
-    if (entity.isHostile) return "text-red-400";
+    if (entity.isDead) {return "text-gray-500";}
+    if (entity.id === activeEntityId) {return "text-cyan-400";}
+    if (entity.id === playerId) {return "text-blue-400";}
+    if (entity.isHostile) {return "text-red-400";}
     return "text-green-400";
   };
 

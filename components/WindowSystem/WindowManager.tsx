@@ -78,7 +78,7 @@ export const WindowManagerProvider: FC<WindowManagerProviderProps> = ({
 
   // Recalculate magnetic snap positions after all windows are loaded
   useEffect(() => {
-    if (!layoutLoaded || windows.length === 0) return;
+    if (!layoutLoaded || windows.length === 0) {return;}
 
     const viewportWidth = window.innerWidth;
     const viewportHeight = window.innerHeight;
@@ -95,11 +95,11 @@ export const WindowManagerProvider: FC<WindowManagerProviderProps> = ({
         windowId: string,
         visited = new Set<string>(),
       ): number => {
-        if (visited.has(windowId)) return 0; // Circular dependency, treat as depth 0
+        if (visited.has(windowId)) {return 0;} // Circular dependency, treat as depth 0
         visited.add(windowId);
 
         const window = windowsById.get(windowId);
-        if (!window || !window.magneticSnap?.windowId) return 0;
+        if (!window || !window.magneticSnap?.windowId) {return 0;}
 
         const targetId = window.magneticSnap.windowId;
         return 1 + getDependencyDepth(targetId, visited);

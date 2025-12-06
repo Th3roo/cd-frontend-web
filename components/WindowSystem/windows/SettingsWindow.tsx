@@ -1,7 +1,9 @@
 import { Settings } from "lucide-react";
-import { WindowConfig } from "../types";
-import KeybindingsSettings from "./components/KeybindingsSettings";
+
 import { KeyBindingManager } from "../../../commands";
+import { WindowConfig } from "../types";
+
+import KeybindingsSettings from "./components/KeybindingsSettings";
 
 export const SETTINGS_WINDOW_ID = "settings";
 

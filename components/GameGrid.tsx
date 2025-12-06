@@ -1,5 +1,3 @@
-import { FC, useState, useCallback, useRef, useEffect } from "react";
-import { createPortal } from "react-dom";
 import {
   Focus,
   Sword,
@@ -11,6 +9,8 @@ import {
   Sparkles,
   Navigation,
 } from "lucide-react";
+import { FC, useState, useCallback, useRef, useEffect } from "react";
+import { createPortal } from "react-dom";
 
 import { SYMBOLS, COLORS } from "../constants";
 import { GameWorld, Entity, Position, EntityType } from "../types";

@@ -1,6 +1,7 @@
-import { WindowConfig } from "../types";
-import { TurnOrderBar } from "./components/TurnOrderBar";
 import { Entity } from "../../../types";
+import { WindowConfig } from "../types";
+
+import { TurnOrderBar } from "./components/TurnOrderBar";
 
 export const TURN_ORDER_BAR_WINDOW_ID = "turn-order-bar";
 

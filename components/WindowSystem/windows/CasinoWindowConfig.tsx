@@ -1,4 +1,5 @@
 import { WindowConfig } from "../types";
+
 import CasinoWindow from "./components/CasinoWindow";
 
 export const CASINO_WINDOW_ID = "easter-egg-casino";

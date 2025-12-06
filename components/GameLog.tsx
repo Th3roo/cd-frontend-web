@@ -1,5 +1,5 @@
-import { useEffect, useRef, useState } from "react";
 import { Code, MapPin } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
 
 import { LogMessage, LogType, Position } from "../types";
 
@@ -25,7 +25,7 @@ const GameLog: React.FC<GameLogProps> = ({
   // Обработчик кликов по кликабельным элементам в тексте
   useEffect(() => {
     const container = logContainerRef.current;
-    if (!container) return;
+    if (!container) {return;}
 
     const handleClick = (e: MouseEvent) => {
       const target = e.target as HTMLElement;

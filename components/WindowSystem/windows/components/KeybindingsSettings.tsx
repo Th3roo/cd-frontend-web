@@ -1,5 +1,5 @@
-import { FC, useState, useEffect } from "react";
 import { Plus, Trash2 } from "lucide-react";
+import { FC, useState, useEffect } from "react";
 
 import {
   CommandAttack,
