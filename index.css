@@ -53,7 +53,7 @@
 
 .turn-order-card-compact.active {
     border-color: #06b6d4;
-    background: #0e7490;
+    border-width: 3px;
 }
 
 .turn-order-card-compact.player {
@@ -62,7 +62,7 @@
 
 .turn-order-card-compact.player.active {
     border-color: #06b6d4;
-    background: #0e7490;
+    border-width: 3px;
 }
 
 .turn-order-card-compact.hostile {
@@ -71,7 +71,7 @@
 
 .turn-order-card-compact.hostile.active {
     border-color: #ef4444;
-    background: #991b1b;
+    border-width: 3px;
 }
 
 .turn-order-card-compact.dead {

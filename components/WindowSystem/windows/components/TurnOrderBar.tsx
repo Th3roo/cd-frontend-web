@@ -1,12 +1,13 @@
 import { useRef, useEffect, useState } from "react";
 
-import { Entity } from "../../../../types";
+import { Entity, ContextMenuData } from "../../../../types";
 
 interface TurnOrderBarProps {
   entities: Entity[];
   activeEntityId: string | null;
   playerId: string | null;
   onEntityClick?: (entityId: string) => void;
+  onContextMenu?: (data: ContextMenuData) => void;
 }
 
 export const TurnOrderBar: React.FC<TurnOrderBarProps> = ({
@@ -14,6 +15,7 @@ export const TurnOrderBar: React.FC<TurnOrderBarProps> = ({
   activeEntityId,
   playerId,
   onEntityClick,
+  onContextMenu,
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const [scrollOffset, setScrollOffset] = useState(0);
@@ -109,6 +111,19 @@ export const TurnOrderBar: React.FC<TurnOrderBarProps> = ({
     return parts.join(" • ");
   };
 
+  const handleContextMenu = (e: React.MouseEvent, entity: Entity) => {
+    e.preventDefault();
+    if (onContextMenu) {
+      onContextMenu({
+        x: e.clientX,
+        y: e.clientY,
+        cellX: entity.pos.x,
+        cellY: entity.pos.y,
+        entities: [entity],
+      });
+    }
+  };
+
   return (
     <div className="p-2 bg-neutral-900 rounded-lg border border-neutral-700 shadow-lg">
       <div ref={containerRef} className="turn-order-scroll-container-compact">
@@ -125,6 +140,7 @@ export const TurnOrderBar: React.FC<TurnOrderBarProps> = ({
               data-turn-index={index}
               title={getTooltipText(entity)}
               onClick={() => onEntityClick?.(entity.id)}
+              onContextMenu={(e) => handleContextMenu(e, entity)}
             >
               <div
                 className={`card-icon-compact text-xl ${getEntityColor(entity)}`}

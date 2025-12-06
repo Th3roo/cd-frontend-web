@@ -102,6 +102,14 @@ export interface LogMessage {
   };
 }
 
+export interface ContextMenuData {
+  x: number;
+  y: number;
+  cellX: number;
+  cellY: number;
+  entities: Entity[];
+}
+
 export interface GameWorld {
   map: Tile[][];
   width: number;

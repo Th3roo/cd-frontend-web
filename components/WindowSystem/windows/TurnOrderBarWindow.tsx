@@ -1,4 +1,4 @@
-import { Entity } from "../../../types";
+import { ContextMenuData, Entity } from "../../../types";
 import { WindowConfig } from "../types";
 
 import { TurnOrderBar } from "./components/TurnOrderBar";
@@ -10,6 +10,7 @@ interface TurnOrderBarWindowOptions {
   activeEntityId: string | null;
   playerId: string | null;
   onEntityClick?: (entityId: string) => void;
+  onContextMenu?: (data: ContextMenuData) => void;
 }
 
 export const createTurnOrderBarWindowConfig = ({
@@ -17,6 +18,7 @@ export const createTurnOrderBarWindowConfig = ({
   activeEntityId,
   playerId,
   onEntityClick,
+  onContextMenu,
 }: TurnOrderBarWindowOptions): WindowConfig => ({
   id: TURN_ORDER_BAR_WINDOW_ID,
   title: "Turn Order Bar",
@@ -36,6 +38,7 @@ export const createTurnOrderBarWindowConfig = ({
       activeEntityId={activeEntityId}
       playerId={playerId}
       onEntityClick={onEntityClick}
+      onContextMenu={onContextMenu}
     />
   ),
 });

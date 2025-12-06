@@ -13,6 +13,7 @@ import {
   KeyBindingManager,
   DEFAULT_KEY_BINDINGS,
 } from "./commands";
+import { ContextMenu } from "./components/ContextMenu";
 import GameGrid from "./components/GameGrid";
 import StatusPanel from "./components/StatusPanel";
 import { WindowManagerProvider, WindowSystem } from "./components/WindowSystem";
@@ -23,6 +24,7 @@ import {
   LogMessage,
   LogType,
   Position,
+  ContextMenuData,
 } from "./types";
 import { findPath } from "./utils/pathfinding";
 
@@ -58,6 +60,7 @@ const App: React.FC = () => {
   const [panStart, setPanStart] = useState({ x: 0, y: 0 });
   const [panOffset, setPanOffset] = useState({ x: 0, y: 0 });
   const [followedEntityId, setFollowedEntityId] = useState<string | null>(null);
+  const [contextMenu, setContextMenu] = useState<ContextMenuData | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
 
   const followInitializedRef = useRef(false);
@@ -494,6 +497,10 @@ const App: React.FC = () => {
       // eslint-disable-next-line no-console
       console.log("Следим за сущностью:", entityId);
     }
+  }, []);
+
+  const handleContextMenu = useCallback((data: ContextMenuData) => {
+    setContextMenu(data);
   }, []);
 
   // Pathfinding execution loop - send next move command
@@ -1021,6 +1028,7 @@ const App: React.FC = () => {
                 onFollowEntity={handleFollowEntity}
                 onSendCommand={sendCommand}
                 onGoToPathfinding={handleGoToPathfinding}
+                onContextMenu={handleContextMenu}
                 selectedTargetEntityId={selectedTargetEntityId}
                 selectedTargetPosition={selectedTargetPosition}
                 pathfindingTarget={pathfindingTarget}
@@ -1034,7 +1042,7 @@ const App: React.FC = () => {
       <WindowManagerProvider>
         <WindowSystem
           keyBindingManager={keyBindingManager}
-          entities={entities}
+          entities={[player, ...entities]}
           activeEntityId={activeEntityId}
           playerId={player.id}
           onEntityClick={handleGoToEntity}
@@ -1042,8 +1050,21 @@ const App: React.FC = () => {
           onGoToPosition={handleGoToPosition}
           onGoToEntity={handleGoToEntity}
           onSendCommand={sendTextCommand}
+          onContextMenu={handleContextMenu}
         />
       </WindowManagerProvider>
+
+      {contextMenu && (
+        <ContextMenu
+          data={contextMenu}
+          onClose={() => setContextMenu(null)}
+          onSelectEntity={handleSelectEntity}
+          onFollowEntity={handleFollowEntity}
+          onSendCommand={sendCommand}
+          onSelectPosition={handleSelectPosition}
+          onGoToPathfinding={handleGoToPathfinding}
+        />
+      )}
     </div>
   );
 };

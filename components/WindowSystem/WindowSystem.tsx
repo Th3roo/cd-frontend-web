@@ -1,7 +1,7 @@
 import { FC, useEffect, useRef, useCallback } from "react";
 
 import { KeyBindingManager } from "../../commands";
-import { Entity, LogMessage, Position } from "../../types";
+import { Entity, LogMessage, Position, ContextMenuData } from "../../types";
 
 import { getStoredWindowState } from "./utils";
 import Window from "./Window";
@@ -31,6 +31,7 @@ interface WindowSystemProps {
   onGoToPosition?: (position: Position) => void;
   onGoToEntity?: (entityId: string) => void;
   onSendCommand?: (text: string, type: "SAY" | "WHISPER" | "YELL") => void;
+  onContextMenu?: (data: ContextMenuData) => void;
 }
 
 const WindowSystem: FC<WindowSystemProps> = ({
@@ -43,6 +44,7 @@ const WindowSystem: FC<WindowSystemProps> = ({
   onGoToPosition,
   onGoToEntity,
   onSendCommand,
+  onContextMenu,
 }) => {
   const {
     windows,
@@ -115,6 +117,7 @@ const WindowSystem: FC<WindowSystemProps> = ({
           activeEntityId,
           playerId,
           onEntityClick,
+          onContextMenu,
         }),
       );
     }
@@ -133,6 +136,7 @@ const WindowSystem: FC<WindowSystemProps> = ({
     onGoToPosition,
     onGoToEntity,
     onSendCommand,
+    onContextMenu,
   ]);
 
   // Update TurnOrderBar content when entities or turn data changes
@@ -143,10 +147,18 @@ const WindowSystem: FC<WindowSystemProps> = ({
         activeEntityId,
         playerId,
         onEntityClick,
+        onContextMenu,
       });
       updateWindowContent(TURN_ORDER_BAR_WINDOW_ID, barConfig.content);
     }
-  }, [entities, activeEntityId, playerId, onEntityClick, updateWindowContent]);
+  }, [
+    entities,
+    activeEntityId,
+    playerId,
+    onEntityClick,
+    updateWindowContent,
+    onContextMenu,
+  ]);
 
   // Update TurnOrderWindow content when entities or turn data changes
   useEffect(() => {

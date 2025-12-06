@@ -1,19 +1,15 @@
-import {
-  Focus,
-  Sword,
-  MessageCircle,
-  Eye,
-  Package,
-  DollarSign,
-  Zap,
-  Sparkles,
-  Navigation,
-} from "lucide-react";
-import { FC, useState, useCallback, useRef, useEffect } from "react";
-import { createPortal } from "react-dom";
+import { FC, useCallback, useState } from "react";
 
-import { SYMBOLS, COLORS } from "../constants";
-import { GameWorld, Entity, Position, EntityType } from "../types";
+import { COLORS, SYMBOLS } from "../constants";
+import {
+  ContextMenuData,
+  Entity,
+  EntityType,
+  GameWorld,
+  Position,
+} from "../types";
+
+import { ContextMenu } from "./ContextMenu";
 
 const BASE_CELL_SIZE = 50; // Базовый размер клетки в пикселях
 
@@ -30,18 +26,11 @@ interface GameGridProps {
   onFollowEntity?: (entityId: string | null) => void;
   onSendCommand?: (action: string, payload?: any) => void;
   onGoToPathfinding?: (position: Position) => void;
+  onContextMenu?: (data: ContextMenuData) => void;
   selectedTargetEntityId?: string | null;
   selectedTargetPosition?: Position | null;
   pathfindingTarget?: Position | null;
   currentPath?: Position[];
-}
-
-interface ContextMenu {
-  x: number;
-  y: number;
-  cellX: number;
-  cellY: number;
-  entities: Entity[];
 }
 
 const GameGrid: FC<GameGridProps> = ({
@@ -55,34 +44,18 @@ const GameGrid: FC<GameGridProps> = ({
   onFollowEntity,
   onSendCommand,
   onGoToPathfinding,
+  onContextMenu,
   selectedTargetEntityId,
   selectedTargetPosition,
   pathfindingTarget,
   currentPath = [],
 }) => {
-  const [contextMenu, setContextMenu] = useState<ContextMenu | null>(null);
+  const [localContextMenu, setLocalContextMenu] =
+    useState<ContextMenuData | null>(null);
   const [isDragging, setIsDragging] = useState(false);
   const [draggedEntity, setDraggedEntity] = useState<Entity | null>(null);
-  const contextMenuRef = useRef<HTMLDivElement>(null);
 
   const CELL_SIZE = BASE_CELL_SIZE * zoom;
-
-  // Закрыть контекстное меню при клике вне его
-  useEffect(() => {
-    const handleClick = (e: MouseEvent) => {
-      if (
-        contextMenuRef.current &&
-        !contextMenuRef.current.contains(e.target as Node)
-      ) {
-        setContextMenu(null);
-      }
-    };
-
-    if (contextMenu) {
-      document.addEventListener("mousedown", handleClick);
-      return () => document.removeEventListener("mousedown", handleClick);
-    }
-  }, [contextMenu]);
 
   const getEntitiesAt = useCallback(
     (x: number, y: number) => {
@@ -133,15 +106,21 @@ const GameGrid: FC<GameGridProps> = ({
 
       const cellEntities = getEntitiesAt(x, y);
 
-      setContextMenu({
+      const data = {
         x: e.clientX,
         y: e.clientY,
         cellX: x,
         cellY: y,
         entities: cellEntities,
-      });
+      };
+
+      if (onContextMenu) {
+        onContextMenu(data);
+      } else {
+        setLocalContextMenu(data);
+      }
     },
-    [getEntitiesAt],
+    [getEntitiesAt, onContextMenu],
   );
 
   const handleDragStart = useCallback((entity: Entity, e: React.DragEvent) => {
@@ -459,196 +438,17 @@ const GameGrid: FC<GameGridProps> = ({
       </div>
 
       {/* Контекстное меню */}
-      {contextMenu &&
-        createPortal(
-          <div
-            ref={contextMenuRef}
-            data-context-menu
-            className="fixed bg-neutral-800 border border-neutral-600 rounded shadow-xl z-50 min-w-48"
-            style={{ left: contextMenu.x, top: contextMenu.y }}
-          >
-            <div className="p-2 border-b border-neutral-700 text-xs text-gray-400">
-              Клетка ({contextMenu.cellX}, {contextMenu.cellY})
-            </div>
-
-            {contextMenu.entities.length > 0 && (
-              <div className="py-1">
-                <div className="px-3 py-1 text-xs text-gray-500 uppercase">
-                  Сущности:
-                </div>
-                {contextMenu.entities.map((entity) => (
-                  <div
-                    key={entity.id}
-                    className="border-b border-neutral-700 last:border-0"
-                  >
-                    <button
-                      className="w-full px-3 py-2 text-left hover:bg-neutral-700 flex items-center gap-2"
-                      onClick={() => {
-                        if (onSelectEntity) {
-                          onSelectEntity(entity.id);
-                        }
-                        setContextMenu(null);
-                      }}
-                    >
-                      <span className={`text-xl ${entity.color}`}>
-                        {entity.symbol}
-                      </span>
-                      <span className="text-sm text-gray-300">
-                        {entity.name}
-                      </span>
-                      {entity.label && (
-                        <span className="ml-auto text-xs bg-red-600 px-1 rounded">
-                          {entity.label}
-                        </span>
-                      )}
-                    </button>
-                    <button
-                      className="w-full px-3 py-1 text-left text-xs hover:bg-neutral-700 text-cyan-400 flex items-center gap-1.5"
-                      onClick={() => {
-                        if (onFollowEntity) {
-                          onFollowEntity(entity.id);
-                        }
-                        setContextMenu(null);
-                      }}
-                    >
-                      <Focus className="w-3 h-3" />
-                      <span>Следить за {entity.name}</span>
-                    </button>
-
-                    <div className="border-t border-neutral-700 mt-1 pt-1">
-                      <button
-                        className="w-full px-3 py-1 text-left text-xs hover:bg-neutral-700 text-red-400 flex items-center gap-1.5"
-                        onClick={() => {
-                          if (onSendCommand) {
-                            onSendCommand("ATTACK", { targetId: entity.id });
-                          }
-                          setContextMenu(null);
-                        }}
-                      >
-                        <Sword className="w-3 h-3" />
-                        <span>Атаковать</span>
-                      </button>
-                      <button
-                        className="w-full px-3 py-1 text-left text-xs hover:bg-neutral-700 text-blue-400 flex items-center gap-1.5"
-                        onClick={() => {
-                          if (onSendCommand) {
-                            onSendCommand("TALK", { targetId: entity.id });
-                          }
-                          setContextMenu(null);
-                        }}
-                      >
-                        <MessageCircle className="w-3 h-3" />
-                        <span>Поговорить</span>
-                      </button>
-                      <button
-                        className="w-full px-3 py-1 text-left text-xs hover:bg-neutral-700 text-yellow-400 flex items-center gap-1.5"
-                        onClick={() => {
-                          if (onSendCommand) {
-                            onSendCommand("INSPECT", { targetId: entity.id });
-                          }
-                          setContextMenu(null);
-                        }}
-                      >
-                        <Eye className="w-3 h-3" />
-                        <span>Осмотреть</span>
-                      </button>
-                      <button
-                        className="w-full px-3 py-1 text-left text-xs hover:bg-neutral-700 text-green-400 flex items-center gap-1.5"
-                        onClick={() => {
-                          if (onSendCommand) {
-                            onSendCommand("PICKUP", { targetId: entity.id });
-                          }
-                          setContextMenu(null);
-                        }}
-                      >
-                        <Package className="w-3 h-3" />
-                        <span>Подобрать</span>
-                      </button>
-                      <button
-                        className="w-full px-3 py-1 text-left text-xs hover:bg-neutral-700 text-purple-400 flex items-center gap-1.5"
-                        onClick={() => {
-                          if (onSendCommand) {
-                            onSendCommand("TRADE", { targetId: entity.id });
-                          }
-                          setContextMenu(null);
-                        }}
-                      >
-                        <DollarSign className="w-3 h-3" />
-                        <span>Торговать</span>
-                      </button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-
-            {contextMenu.entities.length === 0 && (
-              <div className="px-3 py-2 text-sm text-gray-500 italic">
-                Пустая клетка
-              </div>
-            )}
-
-            <div className="border-t border-neutral-700 py-1">
-              <button
-                className="w-full px-3 py-2 text-left text-xs hover:bg-neutral-700 text-gray-400"
-                onClick={() => {
-                  if (onSelectPosition) {
-                    onSelectPosition(contextMenu.cellX, contextMenu.cellY);
-                  }
-                  setContextMenu(null);
-                }}
-              >
-                Выбрать позицию
-              </button>
-              <button
-                className="w-full px-3 py-1 text-left text-xs hover:bg-neutral-700 text-green-400 flex items-center gap-1.5"
-                onClick={() => {
-                  if (onGoToPathfinding) {
-                    onGoToPathfinding({
-                      x: contextMenu.cellX,
-                      y: contextMenu.cellY,
-                    });
-                  }
-                  setContextMenu(null);
-                }}
-              >
-                <Navigation className="w-3 h-3" />
-                <span>Перейти к</span>
-              </button>
-              <button
-                className="w-full px-3 py-1 text-left text-xs hover:bg-neutral-700 text-cyan-400 flex items-center gap-1.5"
-                onClick={() => {
-                  if (onSendCommand) {
-                    onSendCommand("TELEPORT", {
-                      x: contextMenu.cellX,
-                      y: contextMenu.cellY,
-                    });
-                  }
-                  setContextMenu(null);
-                }}
-              >
-                <Zap className="w-3 h-3" />
-                <span>Телепорт</span>
-              </button>
-              <button
-                className="w-full px-3 py-1 text-left text-xs hover:bg-neutral-700 text-purple-400 flex items-center gap-1.5"
-                onClick={() => {
-                  if (onSendCommand) {
-                    onSendCommand("CAST_AREA", {
-                      x: contextMenu.cellX,
-                      y: contextMenu.cellY,
-                    });
-                  }
-                  setContextMenu(null);
-                }}
-              >
-                <Sparkles className="w-3 h-3" />
-                <span>Заклинание на область</span>
-              </button>
-            </div>
-          </div>,
-          document.body,
-        )}
+      {localContextMenu && (
+        <ContextMenu
+          data={localContextMenu}
+          onClose={() => setLocalContextMenu(null)}
+          onSelectEntity={onSelectEntity}
+          onFollowEntity={onFollowEntity}
+          onSendCommand={onSendCommand}
+          onSelectPosition={onSelectPosition}
+          onGoToPathfinding={onGoToPathfinding}
+        />
+      )}
 
       {/* Индикатор перетаскивания */}
       {isDragging && (
