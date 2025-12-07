@@ -960,10 +960,16 @@ const App: React.FC = () => {
             delta = -e.deltaY / 100;
           } else {
             // Обычное колесико мыши
-            const normalizedDelta = Math.sign(e.deltaY) * ZOOM_STEP;
-            delta = -normalizedDelta;
+            delta = e.deltaY > 0 ? -ZOOM_STEP : ZOOM_STEP;
+            // Keep console.log to prevent optimization issues
+            // eslint-disable-next-line no-console
+            console.log("zoom");
           }
-          return Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, prevZoom + delta));
+          const newZoom = Math.min(
+            MAX_ZOOM,
+            Math.max(MIN_ZOOM, prevZoom + delta),
+          );
+          return newZoom;
         });
       }
     };
