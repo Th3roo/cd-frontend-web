@@ -1,4 +1,4 @@
-import { FC, useCallback, useState } from "react";
+import { FC, useCallback, useState, useRef, useEffect } from "react";
 
 import { COLORS, SYMBOLS } from "../constants";
 import {
@@ -57,8 +57,67 @@ const GameGrid: FC<GameGridProps> = ({
     useState<ContextMenuData | null>(null);
   const [isDragging, setIsDragging] = useState(false);
   const [draggedEntity, setDraggedEntity] = useState<Entity | null>(null);
+  const [visibleCells, setVisibleCells] = useState<{
+    minX: number;
+    maxX: number;
+    minY: number;
+    maxY: number;
+  }>({ minX: 0, maxX: world.width, minY: 0, maxY: world.height });
+
+  const gridRef = useRef<HTMLDivElement>(null);
 
   const CELL_SIZE = BASE_CELL_SIZE * zoom;
+
+  // Calculate visible cells based on viewport
+  useEffect(() => {
+    const updateVisibleCells = () => {
+      if (!gridRef.current) {
+        return;
+      }
+
+      const container = gridRef.current.parentElement;
+      if (!container) {
+        return;
+      }
+
+      const containerRect = container.getBoundingClientRect();
+      const gridRect = gridRef.current.getBoundingClientRect();
+
+      // Calculate visible area in grid coordinates
+      const offsetX = containerRect.left - gridRect.left;
+      const offsetY = containerRect.top - gridRect.top;
+
+      // Add buffer to render cells slightly outside viewport
+      const buffer = 2;
+
+      const minX = Math.max(0, Math.floor(-offsetX / CELL_SIZE) - buffer);
+      const maxX = Math.min(
+        world.width,
+        Math.ceil((containerRect.width - offsetX) / CELL_SIZE) + buffer,
+      );
+      const minY = Math.max(0, Math.floor(-offsetY / CELL_SIZE) - buffer);
+      const maxY = Math.min(
+        world.height,
+        Math.ceil((containerRect.height - offsetY) / CELL_SIZE) + buffer,
+      );
+
+      setVisibleCells({ minX, maxX, minY, maxY });
+    };
+
+    updateVisibleCells();
+
+    // Update on scroll or resize
+    const container = gridRef.current?.parentElement;
+    if (container) {
+      container.addEventListener("scroll", updateVisibleCells);
+      window.addEventListener("resize", updateVisibleCells);
+
+      return () => {
+        container.removeEventListener("scroll", updateVisibleCells);
+        window.removeEventListener("resize", updateVisibleCells);
+      };
+    }
+  }, [CELL_SIZE, world.width, world.height]);
 
   const getEntitiesAt = useCallback(
     (x: number, y: number) => {
@@ -261,6 +320,24 @@ const GameGrid: FC<GameGridProps> = ({
   };
 
   const renderCell = (x: number, y: number) => {
+    // Skip rendering cells outside viewport
+    if (
+      x < visibleCells.minX ||
+      x >= visibleCells.maxX ||
+      y < visibleCells.minY ||
+      y >= visibleCells.maxY
+    ) {
+      return (
+        <div
+          key={`${x}-${y}`}
+          style={{
+            width: CELL_SIZE,
+            height: CELL_SIZE,
+          }}
+        />
+      );
+    }
+
     const tile = world.map[y]?.[x];
     if (!tile) {
       return null;
@@ -385,6 +462,7 @@ const GameGrid: FC<GameGridProps> = ({
     <div className="relative">
       {/* Сетка */}
       <div
+        ref={gridRef}
         className="relative bg-black select-none shadow-2xl shadow-black border-neutral-800 box-content"
         style={{
           width: world.width * CELL_SIZE,
