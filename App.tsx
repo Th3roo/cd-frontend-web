@@ -41,7 +41,7 @@ import { findPath } from "./utils/pathfinding";
 
 const MIN_ZOOM = 0.5;
 const MAX_ZOOM = 3;
-const ZOOM_STEP = 0.1;
+const ZOOM_STEP = 1;
 
 const App: React.FC = () => {
   const socketRef = useRef<WebSocket | null>(null);
@@ -967,7 +967,8 @@ const App: React.FC = () => {
             delta = -e.deltaY / 100;
           } else {
             // Обычное колесико мыши
-            delta = e.deltaY > 0 ? -ZOOM_STEP : ZOOM_STEP;
+            const normalizedDelta = Math.sign(e.deltaY) * ZOOM_STEP;
+            delta = -normalizedDelta;
           }
           return Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, prevZoom + delta));
         });
