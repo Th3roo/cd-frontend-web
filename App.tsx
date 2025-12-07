@@ -590,14 +590,10 @@ const App: React.FC = () => {
 
   const handleSelectEntity = useCallback((entityId: string | null) => {
     setSelectedTargetEntityId(entityId);
-    // eslint-disable-next-line no-console
-    console.log("Selected entity:", entityId);
   }, []);
 
   const handleSelectPosition = useCallback((x: number, y: number) => {
     setSelectedTargetPosition({ x, y });
-    // eslint-disable-next-line no-console
-    console.log("Selected position:", x, y);
   }, []);
 
   const handleGoToPosition = useCallback(
@@ -1012,6 +1008,7 @@ const App: React.FC = () => {
 
           hasMoved = false;
           setIsPanning(true);
+          setContextMenu(null); // Close context menu when panning starts
 
           // Если включено следование, вычисляем текущий offset камеры
           let currentOffset = panOffset;
