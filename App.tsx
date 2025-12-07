@@ -41,7 +41,7 @@ import { findPath } from "./utils/pathfinding";
 
 const MIN_ZOOM = 0.5;
 const MAX_ZOOM = 3;
-const ZOOM_STEP = 1;
+const ZOOM_STEP = 0.1;
 
 const App: React.FC = () => {
   const socketRef = useRef<WebSocket | null>(null);
@@ -83,7 +83,6 @@ const App: React.FC = () => {
     () => {
       const saved = localStorage.getItem("splashNotificationsEnabled");
       const value = saved !== null ? JSON.parse(saved) : true;
-      console.log("Initial splash notifications state:", value);
       return value;
     },
   );
@@ -96,7 +95,6 @@ const App: React.FC = () => {
   } = useSplashNotifications();
 
   const handleToggleSplashNotifications = useCallback((enabled: boolean) => {
-    console.log("Toggle splash notifications:", enabled);
     setSplashNotificationsEnabled(enabled);
     localStorage.setItem("splashNotificationsEnabled", JSON.stringify(enabled));
   }, []);
@@ -360,7 +358,6 @@ const App: React.FC = () => {
     };
 
     ws.onclose = (event) => {
-      console.log("WebSocket closed:", event.code, event.reason);
       addLog(`Disconnected from server (${event.code})`, LogType.INFO);
     };
 
@@ -614,7 +611,7 @@ const App: React.FC = () => {
         const containerWidth = containerRef.current.clientWidth;
         const containerHeight = containerRef.current.clientHeight;
         const CELL_SIZE = 50 * zoom;
-        const borderOffset = Math.max(2, zoom * 2);
+        //const borderOffset = Math.max(2, zoom * 2);
         const positionPixelX = position.x * CELL_SIZE + CELL_SIZE / 2;
         const positionPixelY = position.y * CELL_SIZE + CELL_SIZE / 2;
         const offsetX = containerWidth / 2 - positionPixelX;
@@ -641,7 +638,7 @@ const App: React.FC = () => {
 
       if (world) {
         const CELL_SIZE = 50 * zoom;
-        const borderOffset = Math.max(2, zoom * 2);
+        //const borderOffset = Math.max(2, zoom * 2);
 
         const entityPixelX = entity.pos.x * CELL_SIZE + CELL_SIZE / 2;
         const entityPixelY = entity.pos.y * CELL_SIZE + CELL_SIZE / 2;
@@ -1022,7 +1019,7 @@ const App: React.FC = () => {
               const containerWidth = containerRef.current.clientWidth;
               const containerHeight = containerRef.current.clientHeight;
               const CELL_SIZE = 50 * zoom;
-              const borderOffset = Math.max(2, zoom * 2);
+              //const borderOffset = Math.max(2, zoom * 2);
               const entityPixelX =
                 followedEntity.pos.x * CELL_SIZE + CELL_SIZE / 2;
               const entityPixelY =
