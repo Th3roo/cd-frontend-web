@@ -984,6 +984,8 @@ const App: React.FC = () => {
   // Обработка панорамирования (drag to pan)
   useEffect(() => {
     let hasMoved = false;
+    let animationFrameId: number | null = null;
+    let pendingPanOffset: { x: number; y: number } | null = null;
 
     const handleMouseDown = (e: MouseEvent) => {
       if (e.button === 0 && containerRef.current) {
@@ -1048,16 +1050,41 @@ const App: React.FC = () => {
           setFollowedEntityId(null);
         }
         e.preventDefault();
-        setPanOffset({
+
+        // Store pending offset instead of updating immediately
+        pendingPanOffset = {
           x: e.clientX - panStart.x,
           y: e.clientY - panStart.y,
-        });
+        };
+
+        // Use requestAnimationFrame for smooth updates
+        if (!animationFrameId) {
+          animationFrameId = requestAnimationFrame(() => {
+            if (pendingPanOffset) {
+              setPanOffset(pendingPanOffset);
+              pendingPanOffset = null;
+            }
+            animationFrameId = null;
+          });
+        }
       }
     };
 
     const handleMouseUp = () => {
       setIsPanning(false);
       hasMoved = false;
+
+      // Cancel any pending animation frame
+      if (animationFrameId) {
+        cancelAnimationFrame(animationFrameId);
+        animationFrameId = null;
+      }
+
+      // Apply final pending offset
+      if (pendingPanOffset) {
+        setPanOffset(pendingPanOffset);
+        pendingPanOffset = null;
+      }
     };
 
     document.addEventListener("mousedown", handleMouseDown);
@@ -1070,6 +1097,11 @@ const App: React.FC = () => {
       document.removeEventListener("mousedown", handleMouseDown);
       document.removeEventListener("mousemove", handleMouseMove);
       document.removeEventListener("mouseup", handleMouseUp);
+
+      // Cancel animation frame on cleanup
+      if (animationFrameId) {
+        cancelAnimationFrame(animationFrameId);
+      }
     };
   }, [
     isPanning,
