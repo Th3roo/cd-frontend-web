@@ -106,8 +106,9 @@ export const ContextMenu: FC<ContextMenuProps> = ({
               className="border-b border-neutral-700 last:border-0"
             >
               <button
+                type="button"
                 className="w-full px-3 py-2 text-left hover:bg-neutral-700 flex items-center gap-2"
-                onClick={() => {
+                onMouseDown={() => {
                   if (onSelectEntity) {
                     onSelectEntity(entity.id);
                   }
@@ -125,8 +126,9 @@ export const ContextMenu: FC<ContextMenuProps> = ({
                 )}
               </button>
               <button
+                type="button"
                 className="w-full px-3 py-1 text-left text-xs hover:bg-neutral-700 text-cyan-400 flex items-center gap-1.5"
-                onClick={() => {
+                onMouseDown={() => {
                   if (onFollowEntity) {
                     onFollowEntity(entity.id);
                   }
@@ -139,8 +141,9 @@ export const ContextMenu: FC<ContextMenuProps> = ({
 
               <div className="border-t border-neutral-700 mt-1 pt-1">
                 <button
+                  type="button"
                   className="w-full px-3 py-1 text-left text-xs hover:bg-neutral-700 text-red-400 flex items-center gap-1.5"
-                  onClick={() => {
+                  onMouseDown={() => {
                     if (onSendCommand) {
                       onSendCommand("ATTACK", { targetId: entity.id });
                     }
@@ -151,8 +154,9 @@ export const ContextMenu: FC<ContextMenuProps> = ({
                   <span>Атаковать</span>
                 </button>
                 <button
+                  type="button"
                   className="w-full px-3 py-1 text-left text-xs hover:bg-neutral-700 text-blue-400 flex items-center gap-1.5"
-                  onClick={() => {
+                  onMouseDown={() => {
                     if (onSendCommand) {
                       onSendCommand("TALK", { targetId: entity.id });
                     }
@@ -163,8 +167,9 @@ export const ContextMenu: FC<ContextMenuProps> = ({
                   <span>Поговорить</span>
                 </button>
                 <button
+                  type="button"
                   className="w-full px-3 py-1 text-left text-xs hover:bg-neutral-700 text-yellow-400 flex items-center gap-1.5"
-                  onClick={() => {
+                  onMouseDown={() => {
                     if (onSendCommand) {
                       onSendCommand("INSPECT", { targetId: entity.id });
                     }
@@ -172,12 +177,12 @@ export const ContextMenu: FC<ContextMenuProps> = ({
                   }}
                 >
                   <Eye className="w-3 h-3" />
-
                   <span>Осмотреть</span>
                 </button>
                 <button
+                  type="button"
                   className="w-full px-3 py-1 text-left text-xs hover:bg-neutral-700 text-green-400 flex items-center gap-1.5"
-                  onClick={() => {
+                  onMouseDown={() => {
                     if (onSendCommand) {
                       onSendCommand("PICKUP", { targetId: entity.id });
                     }
@@ -188,8 +193,9 @@ export const ContextMenu: FC<ContextMenuProps> = ({
                   <span>Подобрать</span>
                 </button>
                 <button
+                  type="button"
                   className="w-full px-3 py-1 text-left text-xs hover:bg-neutral-700 text-purple-400 flex items-center gap-1.5"
-                  onClick={() => {
+                  onMouseDown={() => {
                     if (onSendCommand) {
                       onSendCommand("TRADE", { targetId: entity.id });
                     }
