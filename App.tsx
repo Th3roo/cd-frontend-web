@@ -90,6 +90,13 @@ const App: React.FC = () => {
 
   const followInitializedRef = useRef(false);
   const zoomTimeoutRef = useRef<number | null>(null);
+  // Сохраняем начальное состояние для зума (чтобы точка под курсором не дрейфовала)
+  const zoomStartRef = useRef<{
+    zoom: number;
+    offset: { x: number; y: number };
+    mouseX: number;
+    mouseY: number;
+  } | null>(null);
   // Флаг первого срабатывания ResizeObserver (для отложенной инициализации)
   const containerReadyRef = useRef(false);
   // Отложенная инициализация следования (ждём готовности контейнера)
@@ -118,25 +125,84 @@ const App: React.FC = () => {
     localStorage.setItem("splashNotificationsEnabled", JSON.stringify(enabled));
   }, []);
 
-  const handleWheel = useCallback((e: React.WheelEvent<HTMLDivElement>) => {
-    // Блокируем зум страницы, оставляя только зум игрового поля
-    e.preventDefault();
-    e.stopPropagation();
+  const handleWheel = useCallback(
+    (e: React.WheelEvent<HTMLDivElement>) => {
+      // Блокируем зум страницы, оставляя только зум игрового поля
+      e.preventDefault();
+      e.stopPropagation();
 
-    if (zoomTimeoutRef.current) {
-      window.clearTimeout(zoomTimeoutRef.current);
-    }
-    setIsZooming(true);
+      // Позиция мыши относительно контейнера
+      const rect = containerRef.current?.getBoundingClientRect();
+      if (!rect) {
+        return;
+      }
 
-    setZoom((prevZoom) => {
-      const delta = e.ctrlKey ? -e.deltaY / 100 : e.deltaY > 0 ? -ZOOM_STEP : ZOOM_STEP;
-      return Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, prevZoom + delta));
-    });
+      const mouseX = e.clientX - rect.left;
+      const mouseY = e.clientY - rect.top;
 
-    zoomTimeoutRef.current = window.setTimeout(() => {
-      setIsZooming(false);
-    }, 150);
-  }, []);
+      // Сохраняем начальное состояние при первом событии зума
+      if (!zoomStartRef.current) {
+        // Вычисляем актуальный offset камеры (учитывая режим следования)
+        let currentOffset = panOffset;
+        if (followedEntityId && containerRef.current) {
+          const followedEntity = entityRegistryRef.current.get(followedEntityId);
+          if (followedEntity) {
+            const CELL_SIZE = 50 * zoom;
+            const containerWidth = containerRef.current.clientWidth;
+            const containerHeight = containerRef.current.clientHeight;
+            const entityPixelX = followedEntity.pos.x * CELL_SIZE + CELL_SIZE / 2;
+            const entityPixelY = followedEntity.pos.y * CELL_SIZE + CELL_SIZE / 2;
+            currentOffset = {
+              x: containerWidth / 2 - entityPixelX,
+              y: containerHeight / 2 - entityPixelY,
+            };
+          }
+          // Отключаем следование при зуме
+          setFollowedEntityId(null);
+        }
+
+        zoomStartRef.current = {
+          zoom,
+          offset: currentOffset,
+          mouseX,
+          mouseY,
+        };
+      }
+
+      if (zoomTimeoutRef.current) {
+        window.clearTimeout(zoomTimeoutRef.current);
+      }
+      setIsZooming(true);
+
+      setZoom((prevZoom) => {
+        const delta = e.ctrlKey
+          ? -e.deltaY / 100
+          : e.deltaY > 0
+            ? -ZOOM_STEP
+            : ZOOM_STEP;
+        const newZoom = Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, prevZoom + delta));
+
+        // Используем сохранённое начальное состояние для расчётов
+        const startState = zoomStartRef.current!;
+        const worldX = (startState.mouseX - startState.offset.x) / startState.zoom;
+        const worldY = (startState.mouseY - startState.offset.y) / startState.zoom;
+
+        // Новый offset, чтобы эта же точка осталась под курсором
+        const newOffsetX = startState.mouseX - worldX * newZoom;
+        const newOffsetY = startState.mouseY - worldY * newZoom;
+
+        setPanOffset({ x: newOffsetX, y: newOffsetY });
+
+        return newZoom;
+      });
+
+      zoomTimeoutRef.current = window.setTimeout(() => {
+        setIsZooming(false);
+        zoomStartRef.current = null; // Сбрасываем начальное состояние
+      }, 150);
+    },
+    [followedEntityId, panOffset, zoom],
+  );
 
   useEffect(() => {
     const preventPageZoom = (e: WheelEvent) => {
