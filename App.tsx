@@ -1,5 +1,6 @@
 import { Focus, Navigation } from "lucide-react";
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
+import { flushSync } from "react-dom";
 
 import {
   CommandAttack,
@@ -79,6 +80,10 @@ const App: React.FC = () => {
 
   const followInitializedRef = useRef(false);
   const zoomTimeoutRef = useRef<number | null>(null);
+  // Флаг первого срабатывания ResizeObserver (для отложенной инициализации)
+  const containerReadyRef = useRef(false);
+  // Отложенная инициализация следования (ждём готовности контейнера)
+  const pendingFollowIdRef = useRef<string | null>(null);
 
   // UI Settings
   const [splashNotificationsEnabled, setSplashNotificationsEnabled] = useState(
@@ -164,7 +169,6 @@ const App: React.FC = () => {
     width: 800,
     height: 600,
   });
-  const [dimensionsUpdateTrigger, setDimensionsUpdateTrigger] = useState(0);
 
   // Единый регистр всех сущностей (включая игрока)
   const entityRegistry = useMemo(() => {
@@ -346,8 +350,9 @@ const App: React.FC = () => {
 
             setPlayer(normalizedPlayer);
             // Инициализируем следование за игроком только один раз при первой загрузке
+            // Откладываем до готовности контейнера (ResizeObserver)
             if (!followInitializedRef.current && normalizedPlayer.id) {
-              setFollowedEntityId(normalizedPlayer.id);
+              pendingFollowIdRef.current = normalizedPlayer.id;
               followInitializedRef.current = true;
             }
           }
@@ -425,6 +430,8 @@ const App: React.FC = () => {
 
   const sendCommand = useCallback(
     (action: string, payload?: any, description?: string) => {
+      // eslint-disable-next-line no-console
+      console.log("sendCommand called", { action, payload });
       if (
         !socketRef.current ||
         socketRef.current.readyState !== WebSocket.OPEN
@@ -441,7 +448,7 @@ const App: React.FC = () => {
         activeEntityId !== player.id &&
         !nonTurnCommands.includes(action)
       ) {
-        // Silently block command when not player's turn
+        addLog("Сейчас не ваш ход — действие отклонено", LogType.INFO);
         return;
       }
 
@@ -554,6 +561,8 @@ const App: React.FC = () => {
         logPosition,
         playerPosition,
       );
+      // eslint-disable-next-line no-console
+      console.log("sendCommand dispatched", { action, payload });
     },
     [entityRegistry, player, activeEntityId, addLog],
   );
@@ -702,13 +711,15 @@ const App: React.FC = () => {
 
   const handleGoToPathfinding = useCallback(
     (targetPos: Position) => {
+      // eslint-disable-next-line no-console
+      console.log("handleGoToPathfinding", { targetPos });
       if (!player || !world) {
         return;
       }
 
       // Check if it's player's turn
       if (activeEntityId && activeEntityId !== player.id) {
-        // Silently block pathfinding when not player's turn
+        addLog("Сейчас не ваш ход — маршрут не построен", LogType.INFO);
         return;
       }
 
@@ -717,6 +728,8 @@ const App: React.FC = () => {
         clearTimeout(pathfindingTimeoutRef.current);
         pathfindingTimeoutRef.current = null;
       }
+      setWaitingForMoveResponse(false);
+      lastCommandedPosRef.current = null;
 
       // Find path
       const path = findPath(player.pos, targetPos, world);
@@ -744,11 +757,22 @@ const App: React.FC = () => {
         targetPos,
         { x: player.pos.x, y: player.pos.y },
       );
+      // eslint-disable-next-line no-console
+      console.log("pathfinding started", { pathLength: path.length });
     },
     [player, world, activeEntityId, addLog],
   );
 
   const handleFollowEntity = useCallback((entityId: string | null) => {
+    // При включении следования — обновляем размеры контейнера синхронно
+    if (entityId && containerRef.current) {
+      flushSync(() => {
+        setContainerDimensions({
+          width: containerRef.current!.clientWidth,
+          height: containerRef.current!.clientHeight,
+        });
+      });
+    }
     setFollowedEntityId(entityId);
     if (entityId) {
       // eslint-disable-next-line no-console
@@ -1123,16 +1147,25 @@ const App: React.FC = () => {
   useEffect(() => {
     const updateDimensions = () => {
       if (containerRef.current) {
-        setContainerDimensions({
+        const newDimensions = {
           width: containerRef.current.clientWidth,
           height: containerRef.current.clientHeight,
+        };
+        // Обновляем state синхронно (для корректного пересчёта cameraOffset)
+        flushSync(() => {
+          setContainerDimensions(newDimensions);
         });
-        setDimensionsUpdateTrigger((prev) => prev + 1);
+
+        // При первом получении реальных размеров — инициализируем отложенное следование
+        if (!containerReadyRef.current && newDimensions.width > 0 && newDimensions.height > 0) {
+          containerReadyRef.current = true;
+          if (pendingFollowIdRef.current) {
+            setFollowedEntityId(pendingFollowIdRef.current);
+            pendingFollowIdRef.current = null;
+          }
+        }
       }
     };
-
-    // Initial update
-    updateDimensions();
 
     // Use ResizeObserver to track container size changes
     const resizeObserver = new ResizeObserver(() => {
@@ -1161,11 +1194,8 @@ const App: React.FC = () => {
 
     const CELL_SIZE = 50 * zoom;
 
-    // Используем реальные размеры контейнера напрямую из ref
-    const containerWidth =
-      containerRef.current?.clientWidth || containerDimensions.width;
-    const containerHeight =
-      containerRef.current?.clientHeight || containerDimensions.height;
+    // Используем размеры контейнера из state (обновляются ResizeObserver)
+    const { width: containerWidth, height: containerHeight } = containerDimensions;
 
     // Позиция отслеживаемой сущности в пикселях относительно сетки
     const entityPixelX = followedEntity.pos.x * CELL_SIZE + CELL_SIZE / 2;
@@ -1176,16 +1206,7 @@ const App: React.FC = () => {
     const offsetY = containerHeight / 2 - entityPixelY;
 
     return { x: offsetX, y: offsetY };
-  }, [
-    followedEntityId,
-    world,
-    player,
-    entityRegistry,
-    panOffset,
-    zoom,
-    containerDimensions,
-    dimensionsUpdateTrigger,
-  ]);
+  }, [followedEntityId, world, player, entityRegistry, panOffset, zoom, containerDimensions]);
 
   // Show "Ваш ход" notification when turn changes to player
   useEffect(() => {
@@ -1231,9 +1252,15 @@ const App: React.FC = () => {
           >
             {/* Индикатор зума и переключатель следования */}
             <div className="absolute top-2 right-2 flex flex-col gap-2 z-50">
-              <div className="bg-black/80 text-white px-3 py-1 rounded text-xs font-mono border border-neutral-600 pointer-events-none">
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setZoom(1);
+                }}
+                className="bg-black/80 text-white px-3 py-1 rounded text-xs font-mono border border-neutral-600 hover:border-cyan-400 hover:text-cyan-200 transition-colors"
+              >
                 Zoom: {(zoom * 100).toFixed(0)}%
-              </div>
+              </button>
               <button
                 onClick={(e) => {
                   e.stopPropagation();
@@ -1248,7 +1275,6 @@ const App: React.FC = () => {
                         const containerHeight =
                           containerRef.current.clientHeight;
                         const CELL_SIZE = 50 * zoom;
-                        const borderOffset = Math.max(2, zoom * 2);
                         const entityPixelX =
                           followedEntity.pos.x * CELL_SIZE + CELL_SIZE / 2;
                         const entityPixelY =
@@ -1260,6 +1286,15 @@ const App: React.FC = () => {
                     }
                     setFollowedEntityId(null);
                   } else {
+                    // При включении следования — обновляем размеры контейнера синхронно
+                    if (containerRef.current) {
+                      flushSync(() => {
+                        setContainerDimensions({
+                          width: containerRef.current!.clientWidth,
+                          height: containerRef.current!.clientHeight,
+                        });
+                      });
+                    }
                     setFollowedEntityId(player?.id || null);
                   }
                 }}

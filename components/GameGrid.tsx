@@ -70,6 +70,7 @@ const GameGrid: FC<GameGridProps> = ({
 
   const CELL_SIZE = BASE_CELL_SIZE * zoom;
 
+
   // Calculate visible cells based on viewport
   useEffect(() => {
     const updateVisibleCells = () => {
@@ -474,6 +475,13 @@ const GameGrid: FC<GameGridProps> = ({
           gridTemplateRows: `repeat(${world.height}, ${CELL_SIZE}px)`,
           borderWidth: `${Math.max(2, zoom * 2)}px`,
           transform: `translate(-${Math.max(2, zoom * 2)}px, -${Math.max(2, zoom * 2)}px)`,
+          backgroundColor: "#050608",
+          backgroundImage: `
+            linear-gradient(to right, rgba(255,255,255,0.06) 1px, transparent 1px),
+            linear-gradient(to bottom, rgba(255,255,255,0.06) 1px, transparent 1px)
+          `,
+          backgroundSize: `${CELL_SIZE}px ${CELL_SIZE}px`,
+          boxShadow: "inset 0 0 30px rgba(0, 0, 0, 0.45)",
         }}
       >
         {world.map.flatMap((row, y) => row.map((_, x) => renderCell(x, y)))}
