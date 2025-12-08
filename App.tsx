@@ -427,8 +427,6 @@ const App: React.FC = () => {
 
   const sendCommand = useCallback(
     (action: string, payload?: any, description?: string) => {
-      // eslint-disable-next-line no-console
-      console.log("sendCommand called", { action, payload });
       if (
         !socketRef.current ||
         socketRef.current.readyState !== WebSocket.OPEN
@@ -558,8 +556,6 @@ const App: React.FC = () => {
         logPosition,
         playerPosition,
       );
-      // eslint-disable-next-line no-console
-      console.log("sendCommand dispatched", { action, payload });
     },
     [entityRegistry, player, activeEntityId, addLog],
   );
@@ -707,8 +703,6 @@ const App: React.FC = () => {
 
   const handleGoToPathfinding = useCallback(
     (targetPos: Position) => {
-      // eslint-disable-next-line no-console
-      console.log("handleGoToPathfinding", { targetPos });
       if (!player || !world) {
         return;
       }
@@ -753,8 +747,6 @@ const App: React.FC = () => {
         targetPos,
         { x: player.pos.x, y: player.pos.y },
       );
-      // eslint-disable-next-line no-console
-      console.log("pathfinding started", { pathLength: path.length });
     },
     [player, world, activeEntityId, addLog],
   );

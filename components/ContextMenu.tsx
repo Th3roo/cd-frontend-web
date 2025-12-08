@@ -216,9 +216,6 @@ export const ContextMenu: FC<ContextMenuProps> = ({
           type="button"
           className="w-full px-3 py-2 text-left text-xs hover:bg-neutral-700 text-gray-400"
           onMouseDown={() => {
-            // Debug: фиксируем клики по пунктам меню
-            // eslint-disable-next-line no-console
-            console.log("ctx: select-position", { x: data.cellX, y: data.cellY });
             if (onSelectPosition) {
               onSelectPosition(data.cellX, data.cellY);
             }
@@ -231,8 +228,6 @@ export const ContextMenu: FC<ContextMenuProps> = ({
           type="button"
           className="w-full px-3 py-1 text-left text-xs hover:bg-neutral-700 text-green-400 flex items-center gap-1.5"
           onMouseDown={() => {
-            // eslint-disable-next-line no-console
-            console.log("ctx: goto", { x: data.cellX, y: data.cellY });
             if (onGoToPathfinding) {
               onGoToPathfinding({
                 x: data.cellX,
@@ -249,8 +244,6 @@ export const ContextMenu: FC<ContextMenuProps> = ({
           type="button"
           className="w-full px-3 py-1 text-left text-xs hover:bg-neutral-700 text-cyan-400 flex items-center gap-1.5"
           onMouseDown={() => {
-            // eslint-disable-next-line no-console
-            console.log("ctx: teleport", { x: data.cellX, y: data.cellY });
             if (onSendCommand) {
               onSendCommand("TELEPORT", {
                 x: data.cellX,
@@ -267,8 +260,6 @@ export const ContextMenu: FC<ContextMenuProps> = ({
           type="button"
           className="w-full px-3 py-1 text-left text-xs hover:bg-neutral-700 text-purple-400 flex items-center gap-1.5"
           onMouseDown={() => {
-            // eslint-disable-next-line no-console
-            console.log("ctx: cast-area", { x: data.cellX, y: data.cellY });
             if (onSendCommand) {
               onSendCommand("CAST_AREA", {
                 x: data.cellX,
