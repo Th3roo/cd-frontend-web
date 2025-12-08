@@ -369,7 +369,7 @@ const Window: FC<WindowProps> = ({ window }) => {
           window.isMinimized && window.minimizeBehavior === "collapse"
             ? "bg-black/40 rounded-lg backdrop-blur-sm border border-neutral-700/50"
             : window.decorated
-              ? `bg-neutral-900 border rounded-lg shadow-2xl ${
+              ? `bg-neutral-900 border rounded-lg ${
                   window.isFocused ? "border-gray-500" : "border-neutral-700"
                 }`
               : "bg-transparent"
@@ -395,6 +395,12 @@ const Window: FC<WindowProps> = ({ window }) => {
             : window.decorated
               ? "default"
               : "grab",
+          boxShadow:
+            window.decorated && !window.isMinimized
+              ? window.isFocused
+                ? "0 0 0 1px rgba(255, 255, 255, 0.08), 0 4px 20px rgba(0, 0, 0, 0.5), 0 8px 40px rgba(0, 0, 0, 0.4), 0 20px 60px rgba(0, 0, 0, 0.3)"
+                : "0 0 0 1px rgba(255, 255, 255, 0.04), 0 4px 15px rgba(0, 0, 0, 0.4), 0 8px 30px rgba(0, 0, 0, 0.3)"
+              : undefined,
         }}
         onMouseDown={(e) => {
           if (!window.decorated) {
