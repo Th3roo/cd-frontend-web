@@ -1,6 +1,5 @@
 import { Focus, Navigation } from "lucide-react";
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
-import { flushSync } from "react-dom";
 
 import {
   CommandAttack,
@@ -84,6 +83,8 @@ const App: React.FC = () => {
   const containerReadyRef = useRef(false);
   // Отложенная инициализация следования (ждём готовности контейнера)
   const pendingFollowIdRef = useRef<string | null>(null);
+  // Триггер для пересчёта cameraOffset при ресайзе (просто счётчик)
+  const [resizeTrigger, setResizeTrigger] = useState(0);
 
   // UI Settings
   const [splashNotificationsEnabled, setSplashNotificationsEnabled] = useState(
@@ -165,10 +166,6 @@ const App: React.FC = () => {
   const [waitingForMoveResponse, setWaitingForMoveResponse] = useState(false);
   const pathfindingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const lastCommandedPosRef = useRef<Position | null>(null);
-  const [containerDimensions, setContainerDimensions] = useState({
-    width: 800,
-    height: 600,
-  });
 
   // Единый регистр всех сущностей (включая игрока)
   const entityRegistry = useMemo(() => {
@@ -693,20 +690,19 @@ const App: React.FC = () => {
       // Отключаем следование и перемещаем камеру к сущности
       setFollowedEntityId(null);
 
-      if (world) {
+      if (world && containerRef.current) {
         const CELL_SIZE = 50 * zoom;
-        //const borderOffset = Math.max(2, zoom * 2);
 
         const entityPixelX = entity.pos.x * CELL_SIZE + CELL_SIZE / 2;
         const entityPixelY = entity.pos.y * CELL_SIZE + CELL_SIZE / 2;
 
-        const offsetX = containerDimensions.width / 2 - entityPixelX;
-        const offsetY = containerDimensions.height / 2 - entityPixelY;
+        const offsetX = containerRef.current.clientWidth / 2 - entityPixelX;
+        const offsetY = containerRef.current.clientHeight / 2 - entityPixelY;
 
         setPanOffset({ x: offsetX, y: offsetY });
       }
     },
-    [entityRegistry, world, zoom, containerDimensions],
+    [entityRegistry, world, zoom],
   );
 
   const handleGoToPathfinding = useCallback(
@@ -764,20 +760,11 @@ const App: React.FC = () => {
   );
 
   const handleFollowEntity = useCallback((entityId: string | null) => {
-    // При включении следования — обновляем размеры контейнера синхронно
-    if (entityId && containerRef.current) {
-      flushSync(() => {
-        setContainerDimensions({
-          width: containerRef.current!.clientWidth,
-          height: containerRef.current!.clientHeight,
-        });
-      });
+    // При включении следования — триггерим пересчёт cameraOffset
+    if (entityId) {
+      setResizeTrigger((prev) => prev + 1);
     }
     setFollowedEntityId(entityId);
-    if (entityId) {
-      // eslint-disable-next-line no-console
-      console.log("Следим за сущностью:", entityId);
-    }
   }, []);
 
   const handleContextMenu = useCallback((data: ContextMenuData) => {
@@ -1145,23 +1132,21 @@ const App: React.FC = () => {
 
   // Update container dimensions when they change
   useEffect(() => {
-    const updateDimensions = () => {
+    const handleResize = () => {
       if (containerRef.current) {
-        const newDimensions = {
-          width: containerRef.current.clientWidth,
-          height: containerRef.current.clientHeight,
-        };
-        // Обновляем state синхронно (для корректного пересчёта cameraOffset)
-        flushSync(() => {
-          setContainerDimensions(newDimensions);
-        });
+        // Просто триггерим пересчёт — ref уже содержит актуальные размеры
+        setResizeTrigger((prev) => prev + 1);
 
         // При первом получении реальных размеров — инициализируем отложенное следование
-        if (!containerReadyRef.current && newDimensions.width > 0 && newDimensions.height > 0) {
-          containerReadyRef.current = true;
-          if (pendingFollowIdRef.current) {
-            setFollowedEntityId(pendingFollowIdRef.current);
-            pendingFollowIdRef.current = null;
+        if (!containerReadyRef.current) {
+          const width = containerRef.current.clientWidth;
+          const height = containerRef.current.clientHeight;
+          if (width > 0 && height > 0) {
+            containerReadyRef.current = true;
+            if (pendingFollowIdRef.current) {
+              setFollowedEntityId(pendingFollowIdRef.current);
+              pendingFollowIdRef.current = null;
+            }
           }
         }
       }
@@ -1169,7 +1154,7 @@ const App: React.FC = () => {
 
     // Use ResizeObserver to track container size changes
     const resizeObserver = new ResizeObserver(() => {
-      updateDimensions();
+      handleResize();
     });
 
     if (containerRef.current) {
@@ -1183,7 +1168,7 @@ const App: React.FC = () => {
 
   // Вычисляем offset для центрирования на отслеживаемой сущности
   const cameraOffset = useMemo(() => {
-    if (!followedEntityId || !world || !player) {
+    if (!followedEntityId || !world || !player || !containerRef.current) {
       return panOffset;
     }
 
@@ -1194,8 +1179,9 @@ const App: React.FC = () => {
 
     const CELL_SIZE = 50 * zoom;
 
-    // Используем размеры контейнера из state (обновляются ResizeObserver)
-    const { width: containerWidth, height: containerHeight } = containerDimensions;
+    // Используем размеры контейнера напрямую из ref (resizeTrigger гарантирует пересчёт)
+    const containerWidth = containerRef.current.clientWidth;
+    const containerHeight = containerRef.current.clientHeight;
 
     // Позиция отслеживаемой сущности в пикселях относительно сетки
     const entityPixelX = followedEntity.pos.x * CELL_SIZE + CELL_SIZE / 2;
@@ -1206,7 +1192,8 @@ const App: React.FC = () => {
     const offsetY = containerHeight / 2 - entityPixelY;
 
     return { x: offsetX, y: offsetY };
-  }, [followedEntityId, world, player, entityRegistry, panOffset, zoom, containerDimensions]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [followedEntityId, world, player, entityRegistry, panOffset, zoom, resizeTrigger]);
 
   // Show "Ваш ход" notification when turn changes to player
   useEffect(() => {
@@ -1286,15 +1273,8 @@ const App: React.FC = () => {
                     }
                     setFollowedEntityId(null);
                   } else {
-                    // При включении следования — обновляем размеры контейнера синхронно
-                    if (containerRef.current) {
-                      flushSync(() => {
-                        setContainerDimensions({
-                          width: containerRef.current!.clientWidth,
-                          height: containerRef.current!.clientHeight,
-                        });
-                      });
-                    }
+                    // При включении следования — триггерим пересчёт cameraOffset
+                    setResizeTrigger((prev) => prev + 1);
                     setFollowedEntityId(player?.id || null);
                   }
                 }}
