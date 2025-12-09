@@ -51,6 +51,8 @@ interface WindowSystemProps {
   isAuthenticated?: boolean;
   wsConnected?: boolean;
   loginError?: string | null;
+  radialMenuOpen?: boolean;
+  contextMenuOpen?: boolean;
 }
 
 const WindowSystem: FC<WindowSystemProps> = ({
@@ -73,6 +75,8 @@ const WindowSystem: FC<WindowSystemProps> = ({
   isAuthenticated = false,
   wsConnected = false,
   loginError = null,
+  radialMenuOpen = false,
+  contextMenuOpen = false,
 }) => {
   const {
     windows,
@@ -85,6 +89,12 @@ const WindowSystem: FC<WindowSystemProps> = ({
   } = useWindowManager();
   const turnOrderBarInitializedRef = useRef(false);
   const loginWindowClosedRef = useRef(false);
+  const windowsRef = useRef(windows);
+
+  // Keep ref in sync with windows state
+  useEffect(() => {
+    windowsRef.current = windows;
+  }, [windows]);
 
   const handleOpenCasino = useCallback(() => {
     openWindow(
@@ -367,27 +377,43 @@ const WindowSystem: FC<WindowSystemProps> = ({
         return;
       }
 
-      // Find the window with the highest zIndex
-      if (windows.length > 0) {
-        const topWindow = windows.reduce((top, current) => {
-          return current.zIndex > top.zIndex ? current : top;
-        });
+      // Don't handle if radial menu or context menu is open (higher priority)
+      if (radialMenuOpen || contextMenuOpen) {
+        return;
+      }
 
-        // Try to close the window, if it can't be closed, minimize it
-        if (topWindow.closeable) {
-          closeWindow(topWindow.id);
-        } else {
-          minimizeWindow(topWindow.id);
+      // Find focused window first, fallback to highest zIndex
+      const currentWindows = windowsRef.current;
+      if (currentWindows.length > 0) {
+        // First, try to find a focused window
+        let targetWindow = currentWindows.find((w) => w.isFocused);
+
+        // If no focused window, find the one with highest zIndex
+        if (!targetWindow) {
+          targetWindow = currentWindows.reduce((top, current) => {
+            return current.zIndex > top.zIndex ? current : top;
+          });
         }
-        e.preventDefault();
+
+        // Try to close the window, if it can't be closed, try to minimize it
+        if (targetWindow.closeable) {
+          closeWindow(targetWindow.id);
+          e.preventDefault();
+          e.stopImmediatePropagation(); // Prevent other Escape handlers from firing
+        } else if (targetWindow.minimizable) {
+          minimizeWindow(targetWindow.id);
+          e.preventDefault();
+          e.stopImmediatePropagation(); // Prevent other Escape handlers from firing
+        }
+        // If neither closeable nor minimizable, do nothing (e.g., Dock, TurnOrderBar)
       }
     };
 
-    window.addEventListener("keydown", handleEscape);
+    window.addEventListener("keydown", handleEscape, { capture: true });
     return () => {
-      window.removeEventListener("keydown", handleEscape);
+      window.removeEventListener("keydown", handleEscape, { capture: true });
     };
-  }, [windows, closeWindow, minimizeWindow]);
+  }, [closeWindow, minimizeWindow, radialMenuOpen, contextMenuOpen]);
 
   return (
     <>

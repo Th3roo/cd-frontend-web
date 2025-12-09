@@ -1225,19 +1225,21 @@ const App: React.FC = () => {
       // Priority 1: Close radial menu
       if (radialMenuOpen) {
         setRadialMenuOpen(false);
+        e.stopImmediatePropagation(); // Prevent other handlers from firing
         return;
       }
 
       // Priority 2: Close context menu
       if (contextMenu) {
         setContextMenu(null);
+        e.stopImmediatePropagation(); // Prevent other handlers from firing
         return;
       }
     };
 
-    window.addEventListener("keydown", handleEscape);
+    window.addEventListener("keydown", handleEscape, { capture: true });
     return () => {
-      window.removeEventListener("keydown", handleEscape);
+      window.removeEventListener("keydown", handleEscape, { capture: true });
     };
   }, [radialMenuOpen, contextMenu]);
 
@@ -1724,6 +1726,8 @@ const App: React.FC = () => {
           isAuthenticated={isAuthenticated}
           wsConnected={isConnected}
           loginError={loginError}
+          radialMenuOpen={radialMenuOpen}
+          contextMenuOpen={contextMenu !== null}
         />
       </WindowManagerProvider>
 
