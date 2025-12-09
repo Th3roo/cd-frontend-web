@@ -2,12 +2,10 @@ import {
   Focus,
   Sword,
   MessageCircle,
-  Eye,
-  Package,
-  DollarSign,
   Zap,
   Sparkles,
   Navigation,
+  Hand,
 } from "lucide-react";
 import { FC, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
@@ -166,6 +164,7 @@ export const ContextMenu: FC<ContextMenuProps> = ({
                   <MessageCircle className="w-3 h-3" />
                   <span>Поговорить</span>
                 </button>
+                {/* TODO: Uncomment when INSPECT is implemented on server
                 <button
                   type="button"
                   className="w-full px-3 py-1 text-left text-xs hover:bg-neutral-700 text-yellow-400 flex items-center gap-1.5"
@@ -179,6 +178,8 @@ export const ContextMenu: FC<ContextMenuProps> = ({
                   <Eye className="w-3 h-3" />
                   <span>Осмотреть</span>
                 </button>
+                */}
+                {/* TODO: Uncomment when PICKUP is implemented on server
                 <button
                   type="button"
                   className="w-full px-3 py-1 text-left text-xs hover:bg-neutral-700 text-green-400 flex items-center gap-1.5"
@@ -192,6 +193,21 @@ export const ContextMenu: FC<ContextMenuProps> = ({
                   <Package className="w-3 h-3" />
                   <span>Подобрать</span>
                 </button>
+                */}
+                <button
+                  type="button"
+                  className="w-full px-3 py-1 text-left text-xs hover:bg-neutral-700 text-cyan-400 flex items-center gap-1.5"
+                  onMouseDown={() => {
+                    if (onSendCommand) {
+                      onSendCommand("INTERACT", { targetId: entity.id });
+                    }
+                    onClose();
+                  }}
+                >
+                  <Hand className="w-3 h-3" />
+                  <span>Взаимодействовать</span>
+                </button>
+                {/* TODO: Uncomment when TRADE is implemented on server
                 <button
                   type="button"
                   className="w-full px-3 py-1 text-left text-xs hover:bg-neutral-700 text-purple-400 flex items-center gap-1.5"
@@ -205,6 +221,7 @@ export const ContextMenu: FC<ContextMenuProps> = ({
                   <DollarSign className="w-3 h-3" />
                   <span>Торговать</span>
                 </button>
+                */}
               </div>
             </div>
           ))}

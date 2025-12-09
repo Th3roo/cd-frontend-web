@@ -23,3 +23,4 @@ export {
   INVENTORY_WINDOW_ID,
   createInventoryWindowConfig,
 } from "./InventoryWindowConfig";
+export { LOGIN_WINDOW_ID, createLoginWindowConfig } from "./LoginWindowConfig";

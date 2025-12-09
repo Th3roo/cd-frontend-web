@@ -3,17 +3,8 @@ import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 
 import {
   CommandAttack,
-  CommandCastArea,
-  CommandInspect,
-  CommandPickup,
-  CommandSay,
   CommandTalk,
-  CommandTeleport,
-  CommandTrade,
-  CommandWhisper,
-  CommandYell,
-  CommandDrop,
-  CommandUse,
+  CommandInteract,
   GameCommand,
   KeyBindingManager,
   DEFAULT_KEY_BINDINGS,
@@ -27,6 +18,8 @@ import {
 import StatusPanel from "./components/StatusPanel";
 import { WindowManagerProvider, WindowSystem } from "./components/WindowSystem";
 import {
+  ClientToServerCommand,
+  serializeClientCommand,
   GameWorld,
   Entity,
   GameState,
@@ -54,6 +47,7 @@ const App: React.FC = () => {
 
   // --- React State (For Rendering) ---
   const [world, setWorld] = useState<GameWorld | null>(null);
+  const worldRef = useRef<GameWorld | null>(null);
   const [player, setPlayer] = useState<Entity | null>(null);
   const [entities, setEntities] = useState<Entity[]>([]);
   const [logs, setLogs] = useState<LogMessage[]>(() => {
@@ -87,6 +81,13 @@ const App: React.FC = () => {
   const [contextMenu, setContextMenu] = useState<ContextMenuData | null>(null);
   const [speechBubbles, setSpeechBubbles] = useState<SpeechBubble[]>([]);
   const containerRef = useRef<HTMLDivElement>(null);
+  const [isConnected, setIsConnected] = useState(false);
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const isAuthenticatedRef = useRef(false);
+  const reconnectTimeoutRef = useRef<number | null>(null);
+  const [reconnectAttempt, setReconnectAttempt] = useState(0);
+  const [isReconnecting, setIsReconnecting] = useState(false);
+  const [loginError, setLoginError] = useState<string | null>(null);
 
   const followInitializedRef = useRef(false);
   const zoomTimeoutRef = useRef<number | null>(null);
@@ -145,13 +146,16 @@ const App: React.FC = () => {
         // Вычисляем актуальный offset камеры (учитывая режим следования)
         let currentOffset = panOffset;
         if (followedEntityId && containerRef.current) {
-          const followedEntity = entityRegistryRef.current.get(followedEntityId);
+          const followedEntity =
+            entityRegistryRef.current.get(followedEntityId);
           if (followedEntity) {
             const CELL_SIZE = 50 * zoom;
             const containerWidth = containerRef.current.clientWidth;
             const containerHeight = containerRef.current.clientHeight;
-            const entityPixelX = followedEntity.pos.x * CELL_SIZE + CELL_SIZE / 2;
-            const entityPixelY = followedEntity.pos.y * CELL_SIZE + CELL_SIZE / 2;
+            const entityPixelX =
+              followedEntity.pos.x * CELL_SIZE + CELL_SIZE / 2;
+            const entityPixelY =
+              followedEntity.pos.y * CELL_SIZE + CELL_SIZE / 2;
             currentOffset = {
               x: containerWidth / 2 - entityPixelX,
               y: containerHeight / 2 - entityPixelY,
@@ -180,12 +184,17 @@ const App: React.FC = () => {
           : e.deltaY > 0
             ? -ZOOM_STEP
             : ZOOM_STEP;
-        const newZoom = Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, prevZoom + delta));
+        const newZoom = Math.min(
+          MAX_ZOOM,
+          Math.max(MIN_ZOOM, prevZoom + delta),
+        );
 
         // Используем сохранённое начальное состояние для расчётов
         const startState = zoomStartRef.current!;
-        const worldX = (startState.mouseX - startState.offset.x) / startState.zoom;
-        const worldY = (startState.mouseY - startState.offset.y) / startState.zoom;
+        const worldX =
+          (startState.mouseX - startState.offset.x) / startState.zoom;
+        const worldY =
+          (startState.mouseY - startState.offset.y) / startState.zoom;
 
         // Новый offset, чтобы эта же точка осталась под курсором
         const newOffsetX = startState.mouseX - worldX * newZoom;
@@ -222,8 +231,12 @@ const App: React.FC = () => {
       }
     };
 
-    window.addEventListener("wheel", preventPageZoom, { passive: false, capture: true });
-    return () => window.removeEventListener("wheel", preventPageZoom, { capture: true });
+    window.addEventListener("wheel", preventPageZoom, {
+      passive: false,
+      capture: true,
+    });
+    return () =>
+      window.removeEventListener("wheel", preventPageZoom, { capture: true });
   }, []);
 
   useEffect(() => {
@@ -324,183 +337,355 @@ const App: React.FC = () => {
 
   // --- WebSocket: Connect to Server ---
   useEffect(() => {
-    // Используем относительный путь для работы через Vite proxy
-    const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
-    const wsUrl = `${protocol}//${window.location.host}/ws`;
-    const ws = new WebSocket(wsUrl);
-    socketRef.current = ws;
+    let reconnectAttempts = 0;
+    const MAX_RECONNECT_ATTEMPTS = 10;
+    const RECONNECT_DELAY = 3000;
 
-    ws.onopen = () => {
-      addLog("Connected to server", LogType.INFO);
-    };
+    const connect = () => {
+      // Используем относительный путь для работы через Vite proxy
+      const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
+      const wsUrl = `${protocol}//${window.location.host}/ws`;
+      const ws = new WebSocket(wsUrl);
+      socketRef.current = ws;
 
-    ws.onmessage = (evt) => {
-      try {
-        // TODO: Handle structured server messages with schema (https://github.com/Cognitive-Dungeon/cd-frontend-web/issues/2)
-        // console.log("WS raw:", evt.data);
-        const msg = JSON.parse(evt.data);
+      ws.onopen = () => {
+        console.log("[App] WebSocket connected");
+        setIsConnected(true);
+        setIsReconnecting(false);
+        setReconnectAttempt(0);
+        setLoginError(null);
+        reconnectAttempts = 0;
+        addLog("Connected to server", LogType.INFO);
+      };
 
-        // Handle INIT/UPDATE payloads from server
-        if (msg?.type === "INIT" || msg?.type === "UPDATE") {
-          if (msg.world) {
-            setWorld(msg.world);
+      ws.onmessage = (evt) => {
+        try {
+          // TODO: Handle structured server messages with schema (https://github.com/Cognitive-Dungeon/cd-frontend-web/issues/2)
+          console.log("[App] WS message received:", evt.data);
+          const msg = JSON.parse(evt.data);
+
+          // Handle error responses from server
+          if (msg?.error) {
+            console.log("[App] Server error:", msg.error);
+            addLog(`Server error: ${msg.error}`, LogType.ERROR);
+            // If error during login (like "Entity not found"), reset authentication
+            if (
+              msg.error.includes("Entity not found") ||
+              msg.error.includes("not found")
+            ) {
+              console.log("[App] Login error - resetting authentication");
+              setIsAuthenticated(false);
+              isAuthenticatedRef.current = false;
+              setLoginError(msg.error);
+            }
           }
-          if (msg.player) {
-            // Normalize player: extract render data if present
-            let normalizedPlayer: any = {
-              ...msg.player,
-              inventory: msg.player.inventory ?? [],
+
+          // Handle INIT/UPDATE payloads from server
+          if (msg?.type === "INIT" || msg?.type === "UPDATE") {
+            console.log("[App] Received UPDATE", {
+              tick: msg.tick,
+              myEntityId: msg.myEntityId,
+              activeEntityId: msg.activeEntityId,
+              gridSize: msg.grid ? `${msg.grid.w}x${msg.grid.h}` : "none",
+              mapTiles: msg.map?.length,
+              entitiesCount: msg.entities?.length,
+            });
+            // Update world from grid and map
+            if (msg.grid && Array.isArray(msg.map)) {
+              console.log("[App] Building world from grid and map");
+              const newWorld: GameWorld = {
+                width: msg.grid.w,
+                height: msg.grid.h,
+                level: worldRef.current?.level ?? 1,
+                globalTick: msg.tick ?? 0,
+                map: [],
+              };
+
+              // Initialize empty map
+              for (let y = 0; y < newWorld.height; y++) {
+                newWorld.map[y] = [];
+                for (let x = 0; x < newWorld.width; x++) {
+                  newWorld.map[y][x] = {
+                    x,
+                    y,
+                    isWall: true,
+                    env: "stone",
+                    isVisible: false,
+                    isExplored: false,
+                  };
+                }
+              }
+
+              // Update tiles from server
+              msg.map.forEach((tileView: any) => {
+                if (
+                  tileView.y >= 0 &&
+                  tileView.y < newWorld.height &&
+                  tileView.x >= 0 &&
+                  tileView.x < newWorld.width
+                ) {
+                  newWorld.map[tileView.y][tileView.x] = {
+                    x: tileView.x,
+                    y: tileView.y,
+                    isWall: tileView.isWall ?? false,
+                    env: tileView.isWall ? "stone" : "floor",
+                    isVisible: tileView.isVisible ?? false,
+                    isExplored: tileView.isExplored ?? false,
+                  };
+                }
+              });
+
+              setWorld(newWorld);
+              worldRef.current = newWorld;
+              console.log("[App] World updated", {
+                width: newWorld.width,
+                height: newWorld.height,
+                tick: newWorld.globalTick,
+              });
+            }
+
+            // Handle entities
+            if (Array.isArray(msg.entities)) {
+              console.log("[App] Processing entities", {
+                count: msg.entities.length,
+                myEntityId: msg.myEntityId,
+              });
+              const normalizedEntities = msg.entities.map((entity: any) => {
+                const normalized: any = {
+                  id: entity.id,
+                  type: entity.type,
+                  name: entity.name,
+                  pos: entity.pos,
+                  symbol: entity.render?.symbol ?? "?",
+                  color: entity.render?.color ?? "#ffffff",
+                  label: entity.render?.label ?? "",
+                  inventory: [],
+                  isHostile: entity.type !== "PLAYER" && entity.type !== "NPC",
+                  isDead: entity.stats?.isDead ?? false,
+                  nextActionTick: 0,
+                  stats: {
+                    hp: entity.stats?.hp ?? 0,
+                    maxHp: entity.stats?.maxHp ?? 0,
+                    stamina: entity.stats?.stamina ?? 0,
+                    maxStamina: entity.stats?.maxStamina ?? 0,
+                    strength: entity.stats?.strength ?? 0,
+                    gold: entity.stats?.gold ?? 0,
+                  },
+                };
+                return normalized;
+              });
+
+              // Find player entity by myEntityId
+              if (msg.myEntityId) {
+                const playerEntity = normalizedEntities.find(
+                  (e: any) => e.id === msg.myEntityId,
+                );
+                if (playerEntity) {
+                  console.log("[App] Player entity found", {
+                    id: playerEntity.id,
+                    name: playerEntity.name,
+                    pos: playerEntity.pos,
+                  });
+                  setPlayer(playerEntity);
+                  // Инициализируем следование за игроком только один раз
+                  if (!followInitializedRef.current) {
+                    pendingFollowIdRef.current = playerEntity.id;
+                    followInitializedRef.current = true;
+                  }
+                } else {
+                  console.warn(
+                    "[App] Player entity not found for myEntityId:",
+                    msg.myEntityId,
+                  );
+                }
+
+                // Set other entities (excluding player)
+                const otherEntities = normalizedEntities.filter(
+                  (e: any) => e.id !== msg.myEntityId,
+                );
+                setEntities(otherEntities);
+              } else {
+                setEntities(normalizedEntities);
+              }
+            }
+
+            // Update active entity
+            if (msg.activeEntityId !== undefined) {
+              setActiveEntityId(msg.activeEntityId);
+            }
+          }
+
+          // Process logs array from server
+          if (Array.isArray(msg?.logs)) {
+            const typeMap: Record<string, LogType> = {
+              INFO: LogType.INFO,
+              ERROR: LogType.ERROR,
+              COMMAND: LogType.COMMAND,
+              NARRATIVE: LogType.NARRATIVE,
+              COMBAT: LogType.COMBAT,
+              SPEECH: LogType.SPEECH,
             };
 
-            if (msg.player.render && typeof msg.player.render === "object") {
-              normalizedPlayer = {
-                ...normalizedPlayer,
-                symbol: msg.player.render.symbol ?? msg.player.symbol,
-                color: msg.player.render.color ?? msg.player.color,
-                label: msg.player.render.label ?? msg.player.label,
-              };
-            }
-
-            // Add test items to inventory if empty
-            if (normalizedPlayer.inventory.length === 0) {
-              normalizedPlayer.inventory = [
-                {
-                  id: "test-potion-1",
-                  name: "Зелье Лечения",
-                  type: "POTION",
-                  value: 50,
-                  description: "Восстанавливает 50 HP",
-                  action: {
-                    type: "HEAL",
-                    requiresTarget: false,
-                    value: 50,
-                  },
-                },
-                {
-                  id: "test-sword-1",
-                  name: "Магический Меч",
-                  type: "WEAPON",
-                  value: 25,
-                  description: "Мощное оружие",
-                  action: {
-                    type: "DAMAGE",
-                    requiresTarget: true,
-                    value: 25,
-                  },
-                },
-                {
-                  id: "test-gold-1",
-                  name: "Золотые Монеты",
-                  type: "GOLD",
-                  value: 100,
-                  description: "100 золотых монет",
-                },
-                {
-                  id: "test-potion-2",
-                  name: "Зелье Маны",
-                  type: "POTION",
-                  value: 30,
-                  description: "Восстанавливает 30 маны",
-                  action: {
-                    type: "BUFF",
-                    requiresTarget: false,
-                    value: 30,
-                  },
-                },
-                {
-                  id: "test-weapon-2",
-                  name: "Огненный Посох",
-                  type: "WEAPON",
-                  value: 40,
-                  description: "Наносит огненный урон",
-                  action: {
-                    type: "DAMAGE",
-                    requiresTarget: true,
-                    value: 40,
-                  },
-                },
-              ];
-            }
-
-            setPlayer(normalizedPlayer);
-            // Инициализируем следование за игроком только один раз при первой загрузке
-            // Откладываем до готовности контейнера (ResizeObserver)
-            if (!followInitializedRef.current && normalizedPlayer.id) {
-              pendingFollowIdRef.current = normalizedPlayer.id;
-              followInitializedRef.current = true;
-            }
-          }
-          if (Array.isArray(msg.entities)) {
-            // Normalize entities: extract render data if present
-            const normalizedEntities = msg.entities.map((entity: any) => {
-              if (entity.render && typeof entity.render === "object") {
-                return {
-                  ...entity,
-                  symbol: entity.render.symbol ?? entity.symbol,
-                  color: entity.render.color ?? entity.color,
-                  label: entity.render.label ?? entity.label,
-                };
+            msg.logs.forEach((entry: any) => {
+              if (
+                entry &&
+                typeof entry === "object" &&
+                typeof entry.text === "string"
+              ) {
+                const t = typeMap[entry.type] ?? LogType.INFO;
+                addLog(entry.text, t);
+              } else if (typeof entry === "string") {
+                addLog(entry, LogType.INFO);
               }
-              return entity;
             });
-            setEntities(normalizedEntities);
           }
-          if (msg.gameState) {
-            setGameState(msg.gameState);
-          }
-          if (msg.activeEntityId !== undefined) {
-            setActiveEntityId(msg.activeEntityId);
-          }
+        } catch (error) {
+          console.error("WebSocket parse error:", error);
+          addLog(`WS parse error: ${error}`, LogType.ERROR);
         }
+      };
 
-        // Process logs array from server
-        if (Array.isArray(msg?.logs)) {
-          const typeMap: Record<string, LogType> = {
-            INFO: LogType.INFO,
-            ERROR: LogType.ERROR,
-            COMMAND: LogType.COMMAND,
-            NARRATIVE: LogType.NARRATIVE,
-            COMBAT: LogType.COMBAT,
-            SPEECH: LogType.SPEECH,
-          };
+      ws.onerror = (error) => {
+        console.error("WebSocket error:", error);
+        addLog("WS error - check console for details", LogType.ERROR);
+      };
 
-          msg.logs.forEach((entry: any) => {
-            if (
-              entry &&
-              typeof entry === "object" &&
-              typeof entry.text === "string"
-            ) {
-              const t = typeMap[entry.type] ?? LogType.INFO;
-              addLog(entry.text, t);
-            } else if (typeof entry === "string") {
-              addLog(entry, LogType.INFO);
-            }
-          });
+      ws.onclose = (event) => {
+        const wasAuthenticated = isAuthenticatedRef.current;
+        console.log("[App] WebSocket closed", {
+          code: event.code,
+          wasAuthenticated,
+        });
+        setIsConnected(false);
+        setIsAuthenticated(false);
+        isAuthenticatedRef.current = false;
+
+        addLog(`Disconnected from server (${event.code})`, LogType.INFO);
+
+        // If we weren't authenticated yet, try to reconnect
+        if (!wasAuthenticated && reconnectAttempts < MAX_RECONNECT_ATTEMPTS) {
+          reconnectAttempts++;
+          console.log(
+            `[App] Reconnecting (attempt ${reconnectAttempts}/${MAX_RECONNECT_ATTEMPTS})`,
+          );
+          setIsReconnecting(true);
+          setReconnectAttempt(reconnectAttempts);
+          addLog(
+            `Reconnecting... (attempt ${reconnectAttempts}/${MAX_RECONNECT_ATTEMPTS})`,
+            LogType.INFO,
+          );
+          reconnectTimeoutRef.current = window.setTimeout(() => {
+            connect();
+          }, RECONNECT_DELAY);
+        } else if (!wasAuthenticated) {
+          console.error(
+            `[App] Failed to connect after ${MAX_RECONNECT_ATTEMPTS} attempts`,
+          );
+          setIsReconnecting(false);
+          addLog(
+            `Failed to connect after ${MAX_RECONNECT_ATTEMPTS} attempts`,
+            LogType.ERROR,
+          );
+        } else {
+          console.log("[App] Disconnected after authentication - no reconnect");
         }
-      } catch (error) {
-        console.error("WebSocket parse error:", error);
-        addLog(`WS parse error: ${error}`, LogType.ERROR);
-      }
+      };
     };
 
-    ws.onerror = (error) => {
-      console.error("WebSocket error:", error);
-      addLog("WS error - check console for details", LogType.ERROR);
-    };
-
-    ws.onclose = (event) => {
-      addLog(`Disconnected from server (${event.code})`, LogType.INFO);
-    };
+    connect();
 
     return () => {
+      if (reconnectTimeoutRef.current) {
+        clearTimeout(reconnectTimeoutRef.current);
+        reconnectTimeoutRef.current = null;
+      }
       try {
-        ws.close();
+        if (socketRef.current) {
+          socketRef.current.close();
+        }
       } catch (e) {
         console.error(e);
       }
       socketRef.current = null;
     };
   }, [addLog]);
+
+  /**
+   * Создает типизированную команду из action и payload
+   *
+   * @param action - Тип действия команды
+   * @param payload - Payload команды
+   * @returns Типизированная команда или null, если команда невалидна
+   */
+  // TODO: Refactor this
+  const createClientCommand = useCallback(
+    (action: string, payload: any): ClientToServerCommand | null => {
+      switch (action) {
+        case "LOGIN":
+          if (!payload.token) {
+            return null;
+          }
+          return {
+            action: "LOGIN",
+            token: payload.token,
+          };
+
+        case "MOVE":
+          return {
+            action: "MOVE",
+            payload: {
+              dx: payload.dx,
+              dy: payload.dy,
+              x: payload.x,
+              y: payload.y,
+            },
+          };
+
+        case "ATTACK":
+          if (!payload.targetId) {
+            return null;
+          }
+          return {
+            action: "ATTACK",
+            payload: { targetId: payload.targetId },
+          };
+
+        case "TALK":
+          if (!payload.targetId) {
+            return null;
+          }
+          return {
+            action: "TALK",
+            payload: { targetId: payload.targetId },
+          };
+
+        case "INTERACT":
+          if (!payload.targetId) {
+            return null;
+          }
+          return {
+            action: "INTERACT",
+            payload: { targetId: payload.targetId },
+          };
+
+        case "WAIT":
+          return {
+            action: "WAIT",
+            payload: {},
+          };
+
+        case "CUSTOM":
+          return {
+            action: "CUSTOM",
+            payload: payload,
+          };
+
+        default:
+          return null;
+      }
+    },
+    [],
+  );
 
   const sendCommand = useCallback(
     (action: string, payload?: any, description?: string) => {
@@ -524,12 +709,15 @@ const App: React.FC = () => {
         return;
       }
 
-      const message = {
-        action,
-        payload: payload ?? {},
-      };
+      // Создаем типизированную команду и сериализуем её
+      const command = createClientCommand(action, payload ?? {});
+      if (!command) {
+        addLog(`Неизвестная команда: ${action}`, LogType.ERROR);
+        return;
+      }
 
-      socketRef.current.send(JSON.stringify(message));
+      const serialized = serializeClientCommand(command);
+      socketRef.current.send(serialized);
 
       // Если описание не передано, пытаемся найти команду и взять её описание
       let commandDescription = description;
@@ -537,16 +725,7 @@ const App: React.FC = () => {
         const commandMap: Record<string, GameCommand> = {
           ATTACK: CommandAttack,
           TALK: CommandTalk,
-          INSPECT: CommandInspect,
-          PICKUP: CommandPickup,
-          TRADE: CommandTrade,
-          TELEPORT: CommandTeleport,
-          CAST_AREA: CommandCastArea,
-          SAY: CommandSay,
-          WHISPER: CommandWhisper,
-          YELL: CommandYell,
-          USE: CommandUse,
-          DROP: CommandDrop,
+          INTERACT: CommandInteract,
         };
         const foundCommand = commandMap[action];
         if (foundCommand) {
@@ -634,7 +813,7 @@ const App: React.FC = () => {
         playerPosition,
       );
     },
-    [entityRegistry, player, activeEntityId, addLog],
+    [createClientCommand, entityRegistry, player, activeEntityId, addLog],
   );
 
   // TODO: Ждем контракта от бекенда, надо будет переделать. Сейчас просто заглушка
@@ -699,6 +878,21 @@ const App: React.FC = () => {
     [player, activeEntityId, sendCommand, addLog],
   );
 
+  const handleLogin = useCallback(
+    (entityId: string) => {
+      console.log("[App] handleLogin called", { entityId });
+      // Clear previous login error
+      setLoginError(null);
+      sendCommand("LOGIN", { token: entityId }, `Авторизация как ${entityId}`);
+      addLog(`Отправлен запрос на авторизацию: ${entityId}`, LogType.INFO);
+      // Set authenticated immediately on login send
+      console.log("[App] Setting isAuthenticated = true");
+      setIsAuthenticated(true);
+      isAuthenticatedRef.current = true;
+    },
+    [sendCommand, addLog, setLoginError, setIsAuthenticated],
+  );
+
   const handleMovePlayer = useCallback(
     (x: number, y: number) => {
       if (!player) {
@@ -707,7 +901,7 @@ const App: React.FC = () => {
 
       // Check if it's player's turn
       if (activeEntityId && activeEntityId !== player.id) {
-        // Silently block movement when not player's turn
+        addLog("Не ваш ход!", LogType.ERROR);
         return;
       }
 
@@ -716,7 +910,7 @@ const App: React.FC = () => {
 
       sendCommand("MOVE", { dx, dy }, `переместились на (${x}, ${y})`);
     },
-    [player, sendCommand, activeEntityId],
+    [player, sendCommand, activeEntityId, addLog],
   );
 
   const handleSelectEntity = useCallback((entityId: string | null) => {
@@ -1262,7 +1456,15 @@ const App: React.FC = () => {
 
     return { x: offsetX, y: offsetY };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [followedEntityId, world, player, entityRegistry, panOffset, zoom, resizeTrigger]);
+  }, [
+    followedEntityId,
+    world,
+    player,
+    entityRegistry,
+    panOffset,
+    zoom,
+    resizeTrigger,
+  ]);
 
   // Show "Ваш ход" notification when turn changes to player
   useEffect(() => {
@@ -1283,22 +1485,38 @@ const App: React.FC = () => {
     splashNotificationsEnabled,
   ]);
 
-  if (!world || !player) {
-    return <div className="text-white p-10">Connecting to server...</div>;
-  }
-
   const selectedTarget = selectedTargetEntityId
     ? entities.find((e) => e.id === selectedTargetEntityId)
     : null;
 
   return (
     <div className="flex flex-col h-screen w-full bg-neutral-950 overflow-hidden text-gray-300 font-mono">
-      <StatusPanel
-        player={player}
-        gameState={gameState}
-        globalTick={world.globalTick}
-        target={selectedTarget}
-      />
+      {/* Индикатор подключения */}
+      {!isConnected && !isReconnecting && (
+        <div className="absolute top-4 left-1/2 transform -translate-x-1/2 z-50 bg-orange-600 text-white px-4 py-2 rounded-lg shadow-lg flex items-center gap-2 animate-pulse">
+          <div className="w-2 h-2 bg-white rounded-full animate-ping"></div>
+          <span className="font-semibold">Подключение к серверу...</span>
+        </div>
+      )}
+
+      {/* Индикатор переподключения */}
+      {isReconnecting && (
+        <div className="absolute top-4 left-1/2 transform -translate-x-1/2 z-50 bg-red-600 text-white px-4 py-2 rounded-lg shadow-lg flex items-center gap-2 animate-pulse">
+          <div className="w-2 h-2 bg-white rounded-full animate-ping"></div>
+          <span className="font-semibold">
+            Переподключение... (попытка {reconnectAttempt}/10)
+          </span>
+        </div>
+      )}
+
+      {player && (
+        <StatusPanel
+          player={player}
+          gameState={gameState}
+          globalTick={world?.globalTick ?? 0}
+          target={selectedTarget}
+        />
+      )}
       <div className="flex flex-1 overflow-hidden">
         <div className="flex-1 bg-black flex flex-col relative border-r border-neutral-800">
           <div
@@ -1306,109 +1524,129 @@ const App: React.FC = () => {
             className={`absolute inset-0 overflow-hidden ${isPanning ? "cursor-grabbing" : "cursor-grab"}`}
             onWheel={handleWheel}
           >
-            {/* Индикатор зума и переключатель следования */}
-            <div className="absolute top-2 right-2 flex flex-col gap-2 z-50">
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setZoom(1);
-                }}
-                className="bg-black/80 text-white px-3 py-1 rounded text-xs font-mono border border-neutral-600 hover:border-cyan-400 hover:text-cyan-200 transition-colors"
-              >
-                Zoom: {(zoom * 100).toFixed(0)}%
-              </button>
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  if (followedEntityId) {
-                    // Вычисляем и сохраняем текущий offset камеры перед выходом из режима следования
-                    if (containerRef.current && world) {
-                      const followedEntity =
-                        entityRegistry.get(followedEntityId);
+            {/* Сообщение ожидания данных */}
+            {(!world || !player) && (
+              <div className="absolute inset-0 flex items-center justify-center">
+                <div className="text-center">
+                  <div className="text-gray-400 text-xl mb-4">
+                    Ожидание данных от сервера...
+                  </div>
+                  <div className="text-gray-600 text-sm">
+                    Подключитесь к серверу для начала игры
+                  </div>
+                </div>
+              </div>
+            )}
 
-                      if (followedEntity) {
-                        const containerWidth = containerRef.current.clientWidth;
-                        const containerHeight =
-                          containerRef.current.clientHeight;
-                        const CELL_SIZE = 50 * zoom;
-                        const entityPixelX =
-                          followedEntity.pos.x * CELL_SIZE + CELL_SIZE / 2;
-                        const entityPixelY =
-                          followedEntity.pos.y * CELL_SIZE + CELL_SIZE / 2;
-                        const offsetX = containerWidth / 2 - entityPixelX;
-                        const offsetY = containerHeight / 2 - entityPixelY;
-                        setPanOffset({ x: offsetX, y: offsetY });
+            {/* Индикатор зума и переключатель следования */}
+            {world && player && (
+              <div className="absolute top-2 right-2 flex flex-col gap-2 z-50">
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setZoom(1);
+                  }}
+                  className="bg-black/80 text-white px-3 py-1 rounded text-xs font-mono border border-neutral-600 hover:border-cyan-400 hover:text-cyan-200 transition-colors"
+                >
+                  Zoom: {(zoom * 100).toFixed(0)}%
+                </button>
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    if (followedEntityId) {
+                      // Вычисляем и сохраняем текущий offset камеры перед выходом из режима следования
+                      if (containerRef.current && world) {
+                        const followedEntity =
+                          entityRegistry.get(followedEntityId);
+
+                        if (followedEntity) {
+                          const containerWidth =
+                            containerRef.current.clientWidth;
+                          const containerHeight =
+                            containerRef.current.clientHeight;
+                          const CELL_SIZE = 50 * zoom;
+                          const entityPixelX =
+                            followedEntity.pos.x * CELL_SIZE + CELL_SIZE / 2;
+                          const entityPixelY =
+                            followedEntity.pos.y * CELL_SIZE + CELL_SIZE / 2;
+                          const offsetX = containerWidth / 2 - entityPixelX;
+                          const offsetY = containerHeight / 2 - entityPixelY;
+                          setPanOffset({ x: offsetX, y: offsetY });
+                        }
                       }
+                      setFollowedEntityId(null);
+                    } else {
+                      // При включении следования — триггерим пересчёт cameraOffset
+                      setResizeTrigger((prev) => prev + 1);
+                      setFollowedEntityId(player?.id || null);
                     }
-                    setFollowedEntityId(null);
-                  } else {
-                    // При включении следования — триггерим пересчёт cameraOffset
-                    setResizeTrigger((prev) => prev + 1);
-                    setFollowedEntityId(player?.id || null);
-                  }
-                }}
-                onMouseDown={(e) => e.stopPropagation()}
-                className={`px-3 py-1 rounded text-xs font-mono border transition-colors flex items-center gap-1.5 ${
-                  followedEntityId
-                    ? "bg-cyan-600/80 text-white border-cyan-500"
-                    : "bg-black/80 text-gray-400 border-neutral-600"
-                }`}
-              >
-                {followedEntityId ? (
-                  followedEntityId === player?.id ? (
-                    <>
-                      <Focus className="w-3 h-3" />
-                      <span>Следовать</span>
-                    </>
+                  }}
+                  onMouseDown={(e) => e.stopPropagation()}
+                  className={`px-3 py-1 rounded text-xs font-mono border transition-colors flex items-center gap-1.5 ${
+                    followedEntityId
+                      ? "bg-cyan-600/80 text-white border-cyan-500"
+                      : "bg-black/80 text-gray-400 border-neutral-600"
+                  }`}
+                >
+                  {followedEntityId ? (
+                    followedEntityId === player?.id ? (
+                      <>
+                        <Focus className="w-3 h-3" />
+                        <span>Следовать</span>
+                      </>
+                    ) : (
+                      <>
+                        <Focus className="w-3 h-3" />
+                        <span>
+                          Следую за{" "}
+                          {entityRegistry.get(followedEntityId)?.name ||
+                            "сущностью"}
+                        </span>
+                      </>
+                    )
                   ) : (
                     <>
-                      <Focus className="w-3 h-3" />
-                      <span>
-                        Следую за{" "}
-                        {entityRegistry.get(followedEntityId)?.name ||
-                          "сущностью"}
-                      </span>
+                      <Navigation className="w-3 h-3" />
+                      <span>Свободно</span>
                     </>
-                  )
-                ) : (
-                  <>
-                    <Navigation className="w-3 h-3" />
-                    <span>Свободно</span>
-                  </>
-                )}
-              </button>
-            </div>
-            <div
-              className="absolute top-0 left-0"
-              style={{
-                transform: `translate(${cameraOffset.x}px, ${cameraOffset.y}px)`,
-                transition: followedEntityId
-                  ? "transform 0.3s ease-out"
-                  : "none",
-              }}
-            >
-              <GameGrid
-                world={world}
-                entities={[player, ...entities]}
-                playerPos={player.pos}
-                fovRadius={8}
-                zoom={zoom}
-                disableAnimations={isZooming}
-                followedEntityId={followedEntityId}
-                speechBubbles={speechBubbles}
-                onMovePlayer={handleMovePlayer}
-                onSelectEntity={handleSelectEntity}
-                onSelectPosition={handleSelectPosition}
-                onFollowEntity={handleFollowEntity}
-                onSendCommand={sendCommand}
-                onGoToPathfinding={handleGoToPathfinding}
-                onContextMenu={handleContextMenu}
-                selectedTargetEntityId={selectedTargetEntityId}
-                selectedTargetPosition={selectedTargetPosition}
-                pathfindingTarget={pathfindingTarget}
-                currentPath={currentPath}
-              />
-            </div>
+                  )}
+                </button>
+              </div>
+            )}
+
+            {world && player && (
+              <div
+                className="absolute top-0 left-0"
+                style={{
+                  transform: `translate(${cameraOffset.x}px, ${cameraOffset.y}px)`,
+                  transition: followedEntityId
+                    ? "transform 0.3s ease-out"
+                    : "none",
+                }}
+              >
+                <GameGrid
+                  world={world}
+                  entities={[player, ...entities]}
+                  playerPos={player.pos}
+                  fovRadius={8}
+                  zoom={zoom}
+                  disableAnimations={isZooming}
+                  followedEntityId={followedEntityId}
+                  speechBubbles={speechBubbles}
+                  onMovePlayer={handleMovePlayer}
+                  onSelectEntity={handleSelectEntity}
+                  onSelectPosition={handleSelectPosition}
+                  onFollowEntity={handleFollowEntity}
+                  onSendCommand={sendCommand}
+                  onGoToPathfinding={handleGoToPathfinding}
+                  onContextMenu={handleContextMenu}
+                  selectedTargetEntityId={selectedTargetEntityId}
+                  selectedTargetPosition={selectedTargetPosition}
+                  pathfindingTarget={pathfindingTarget}
+                  currentPath={currentPath}
+                />
+              </div>
+            )}
           </div>
         </div>
       </div>
@@ -1416,9 +1654,9 @@ const App: React.FC = () => {
       <WindowManagerProvider>
         <WindowSystem
           keyBindingManager={keyBindingManager}
-          entities={[player, ...entities]}
+          entities={player ? [player, ...entities] : entities}
           activeEntityId={activeEntityId}
-          playerId={player.id}
+          playerId={player?.id ?? null}
           onEntityClick={handleGoToEntity}
           logs={logs}
           onGoToPosition={handleGoToPosition}
@@ -1427,9 +1665,13 @@ const App: React.FC = () => {
           onContextMenu={handleContextMenu}
           splashNotificationsEnabled={splashNotificationsEnabled}
           onToggleSplashNotifications={handleToggleSplashNotifications}
-          playerInventory={player.inventory}
+          playerInventory={player?.inventory ?? []}
           onUseItem={handleUseItem}
           onDropItem={handleDropItem}
+          onLogin={handleLogin}
+          isAuthenticated={isAuthenticated}
+          wsConnected={isConnected}
+          loginError={loginError}
         />
       </WindowManagerProvider>
 

@@ -95,6 +95,13 @@ export const CommandPickup: GameCommand = {
   requiresEntityTarget: true,
 };
 
+export const CommandInteract: GameCommand = {
+  action: "INTERACT",
+  label: "Interact",
+  description: "Вы взаимодействовали с {targetName}",
+  requiresEntityTarget: true,
+};
+
 export const CommandTrade: GameCommand = {
   action: "TRADE",
   label: "Trade",
