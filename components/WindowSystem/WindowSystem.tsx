@@ -352,6 +352,43 @@ const WindowSystem: FC<WindowSystemProps> = ({
     }
   }, [isAuthenticated, closeWindow]);
 
+  // Escape key handler to close/minimize windows by z-index
+  useEffect(() => {
+    const handleEscape = (e: KeyboardEvent) => {
+      if (e.key !== "Escape") {
+        return;
+      }
+
+      // Ignore if typing in input
+      if (
+        e.target instanceof HTMLInputElement ||
+        e.target instanceof HTMLTextAreaElement
+      ) {
+        return;
+      }
+
+      // Find the window with the highest zIndex
+      if (windows.length > 0) {
+        const topWindow = windows.reduce((top, current) => {
+          return current.zIndex > top.zIndex ? current : top;
+        });
+
+        // Try to close the window, if it can't be closed, minimize it
+        if (topWindow.closeable) {
+          closeWindow(topWindow.id);
+        } else {
+          minimizeWindow(topWindow.id);
+        }
+        e.preventDefault();
+      }
+    };
+
+    window.addEventListener("keydown", handleEscape);
+    return () => {
+      window.removeEventListener("keydown", handleEscape);
+    };
+  }, [windows, closeWindow, minimizeWindow]);
+
   return (
     <>
       {/* Render all windows */}

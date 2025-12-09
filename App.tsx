@@ -79,6 +79,7 @@ const App: React.FC = () => {
   const [panOffset, setPanOffset] = useState({ x: 0, y: 0 });
   const [followedEntityId, setFollowedEntityId] = useState<string | null>(null);
   const [contextMenu, setContextMenu] = useState<ContextMenuData | null>(null);
+  const [radialMenuOpen, setRadialMenuOpen] = useState(false);
   const [speechBubbles, setSpeechBubbles] = useState<SpeechBubble[]>([]);
   const containerRef = useRef<HTMLDivElement>(null);
   const [isConnected, setIsConnected] = useState(false);
@@ -1204,6 +1205,42 @@ const App: React.FC = () => {
     };
   }, []);
 
+  // Global Escape key handler - closes radial menu and context menu
+  useEffect(() => {
+    const handleEscape = (e: KeyboardEvent) => {
+      if (e.key !== "Escape") {
+        return;
+      }
+
+      // Ignore if typing in input
+      if (
+        e.target instanceof HTMLInputElement ||
+        e.target instanceof HTMLTextAreaElement
+      ) {
+        return;
+      }
+
+      e.preventDefault();
+
+      // Priority 1: Close radial menu
+      if (radialMenuOpen) {
+        setRadialMenuOpen(false);
+        return;
+      }
+
+      // Priority 2: Close context menu
+      if (contextMenu) {
+        setContextMenu(null);
+        return;
+      }
+    };
+
+    window.addEventListener("keydown", handleEscape);
+    return () => {
+      window.removeEventListener("keydown", handleEscape);
+    };
+  }, [radialMenuOpen, contextMenu]);
+
   // Global key handler for game controls
   useEffect(() => {
     const handleGlobalKeyDown = (e: KeyboardEvent) => {
@@ -1646,6 +1683,7 @@ const App: React.FC = () => {
                   disableAnimations={isZooming}
                   followedEntityId={followedEntityId}
                   speechBubbles={speechBubbles}
+                  radialMenuOpen={radialMenuOpen}
                   onMovePlayer={handleMovePlayer}
                   onSelectEntity={handleSelectEntity}
                   onSelectPosition={handleSelectPosition}
@@ -1653,6 +1691,7 @@ const App: React.FC = () => {
                   onSendCommand={sendCommand}
                   onGoToPathfinding={handleGoToPathfinding}
                   onContextMenu={handleContextMenu}
+                  onRadialMenuChange={setRadialMenuOpen}
                   selectedTargetEntityId={selectedTargetEntityId}
                   selectedTargetPosition={selectedTargetPosition}
                   pathfindingTarget={pathfindingTarget}

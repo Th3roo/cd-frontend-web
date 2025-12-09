@@ -25,6 +25,7 @@ interface GameGridProps {
   disableAnimations?: boolean;
   followedEntityId?: string | null;
   speechBubbles?: SpeechBubble[];
+  radialMenuOpen?: boolean;
   onMovePlayer?: (x: number, y: number) => void;
   onSelectEntity?: (entityId: string | null) => void;
   onSelectPosition?: (x: number, y: number) => void;
@@ -32,6 +33,7 @@ interface GameGridProps {
   onSendCommand?: (action: string, payload?: any) => void;
   onGoToPathfinding?: (position: Position) => void;
   onContextMenu?: (data: ContextMenuData) => void;
+  onRadialMenuChange?: (isOpen: boolean) => void;
   selectedTargetEntityId?: string | null;
   selectedTargetPosition?: Position | null;
   pathfindingTarget?: Position | null;
@@ -45,6 +47,7 @@ const GameGrid: FC<GameGridProps> = ({
   disableAnimations = false,
   followedEntityId = null,
   speechBubbles = [],
+  radialMenuOpen = false,
   onMovePlayer,
   onSelectEntity,
   onSelectPosition,
@@ -52,6 +55,7 @@ const GameGrid: FC<GameGridProps> = ({
   onSendCommand,
   onGoToPathfinding,
   onContextMenu,
+  onRadialMenuChange,
   selectedTargetEntityId,
   selectedTargetPosition,
   pathfindingTarget,
@@ -172,12 +176,18 @@ const GameGrid: FC<GameGridProps> = ({
           x: rect.left,
           y: rect.top,
         });
+        if (onRadialMenuChange) {
+          onRadialMenuChange(true);
+        }
         return;
       }
 
       // Close radial menu if clicking elsewhere
       if (radialMenu) {
         setRadialMenu(null);
+        if (onRadialMenuChange) {
+          onRadialMenuChange(false);
+        }
       }
 
       // Выбор позиции
@@ -200,6 +210,7 @@ const GameGrid: FC<GameGridProps> = ({
       getEntitiesAt,
       selectedTargetPosition,
       radialMenu,
+      onRadialMenuChange,
     ],
   );
 
@@ -291,8 +302,14 @@ const GameGrid: FC<GameGridProps> = ({
           }
           break;
       }
+
+      // Close radial menu after action
+      setRadialMenu(null);
+      if (onRadialMenuChange) {
+        onRadialMenuChange(false);
+      }
     },
-    [onSendCommand, onSelectEntity],
+    [onSendCommand, onSelectEntity, onRadialMenuChange],
   );
 
   const getRadialMenuActions = useCallback((entity: Entity) => {
@@ -746,11 +763,24 @@ const GameGrid: FC<GameGridProps> = ({
           entity={radialMenu.entity}
           actions={getRadialMenuActions(radialMenu.entity)}
           onAction={handleRadialAction}
-          onClose={() => setRadialMenu(null)}
+          onClose={() => {
+            setRadialMenu(null);
+            if (onRadialMenuChange) {
+              onRadialMenuChange(false);
+            }
+          }}
           cellSize={CELL_SIZE}
           zoom={zoom}
         />
       )}
+
+      {/* Close radial menu if external prop changes */}
+      {!radialMenuOpen &&
+        radialMenu &&
+        (() => {
+          setRadialMenu(null);
+          return null;
+        })()}
 
       {/* Индикатор перетаскивания */}
       {isDragging && (
