@@ -29,12 +29,65 @@ import {
   ContextMenuData,
   SpeechBubble,
   Item,
+  ClientToServerMovePayload,
+  ClientToServerEntityTargetPayload,
+  ClientToServerCustomPayload,
 } from "./types";
 import { findPath } from "./utils/pathfinding";
 
 const MIN_ZOOM = 0.5;
 const MAX_ZOOM = 3;
 const ZOOM_STEP = 0.1;
+
+// Константы для типов действий для лучшей читаемости и типобезопасности
+const ACTION_TYPES = {
+  LOGIN: "LOGIN" as const,
+  MOVE: "MOVE" as const,
+  ATTACK: "ATTACK" as const,
+  TALK: "TALK" as const,
+  INTERACT: "INTERACT" as const,
+  WAIT: "WAIT" as const,
+  CUSTOM: "CUSTOM" as const,
+};
+
+type CommandHandler<T = any> = (payload: T) => ClientToServerCommand | null;
+
+// Маппинг обработчиков команд
+const commandHandlers: Record<ClientToServerCommand["action"], CommandHandler> =
+  {
+    [ACTION_TYPES.LOGIN]: (p: { token: string }) =>
+      p.token ? { action: ACTION_TYPES.LOGIN, token: p.token } : null,
+
+    [ACTION_TYPES.MOVE]: (p: ClientToServerMovePayload) => ({
+      action: ACTION_TYPES.MOVE,
+      payload: { dx: p.dx, dy: p.dy, x: p.x, y: p.y },
+    }),
+
+    [ACTION_TYPES.ATTACK]: (p: ClientToServerEntityTargetPayload) =>
+      p.targetId
+        ? { action: ACTION_TYPES.ATTACK, payload: { targetId: p.targetId } }
+        : null,
+
+    [ACTION_TYPES.TALK]: (p: ClientToServerEntityTargetPayload) =>
+      p.targetId
+        ? { action: ACTION_TYPES.TALK, payload: { targetId: p.targetId } }
+        : null,
+
+    [ACTION_TYPES.INTERACT]: (p: ClientToServerEntityTargetPayload) =>
+      p.targetId
+        ? {
+            action: ACTION_TYPES.INTERACT,
+            payload: { targetId: p.targetId },
+          }
+        : null,
+
+    [ACTION_TYPES.WAIT]: () => ({ action: ACTION_TYPES.WAIT, payload: {} }),
+
+    [ACTION_TYPES.CUSTOM]: (p: ClientToServerCustomPayload) => ({
+      action: ACTION_TYPES.CUSTOM,
+      payload: p,
+    }),
+  };
 
 const App: React.FC = () => {
   const socketRef = useRef<WebSocket | null>(null);
@@ -582,72 +635,11 @@ const App: React.FC = () => {
    * @param payload - Payload команды
    * @returns Типизированная команда или null, если команда невалидна
    */
-  // TODO: Refactor this
   const createClientCommand = useCallback(
     (action: string, payload: any): ClientToServerCommand | null => {
-      switch (action) {
-        case "LOGIN":
-          if (!payload.token) {
-            return null;
-          }
-          return {
-            action: "LOGIN",
-            token: payload.token,
-          };
-
-        case "MOVE":
-          return {
-            action: "MOVE",
-            payload: {
-              dx: payload.dx,
-              dy: payload.dy,
-              x: payload.x,
-              y: payload.y,
-            },
-          };
-
-        case "ATTACK":
-          if (!payload.targetId) {
-            return null;
-          }
-          return {
-            action: "ATTACK",
-            payload: { targetId: payload.targetId },
-          };
-
-        case "TALK":
-          if (!payload.targetId) {
-            return null;
-          }
-          return {
-            action: "TALK",
-            payload: { targetId: payload.targetId },
-          };
-
-        case "INTERACT":
-          if (!payload.targetId) {
-            return null;
-          }
-          return {
-            action: "INTERACT",
-            payload: { targetId: payload.targetId },
-          };
-
-        case "WAIT":
-          return {
-            action: "WAIT",
-            payload: {},
-          };
-
-        case "CUSTOM":
-          return {
-            action: "CUSTOM",
-            payload: payload,
-          };
-
-        default:
-          return null;
-      }
+      const handler =
+        commandHandlers[action as ClientToServerCommand["action"]];
+      return handler ? handler(payload) : null;
     },
     [],
   );
