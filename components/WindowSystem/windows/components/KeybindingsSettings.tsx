@@ -657,7 +657,7 @@ const KeybindingsSettings: FC<KeybindingsSettingsProps> = ({
                   </h3>
                   <p className="text-sm text-gray-400">
                     Показывать текстовые уведомления в центре экрана (например,
-                    "Ваш ход")
+                    &quot;Ваш ход&quot;)
                   </p>
                 </div>
                 <label className="relative inline-flex items-center cursor-pointer">

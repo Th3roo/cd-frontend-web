@@ -7,7 +7,7 @@ import {
   Navigation,
   Hand,
 } from "lucide-react";
-import { FC, useEffect, useRef, useState } from "react";
+import { FC, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 
 import { ContextMenuData, Position } from "../types";
@@ -35,7 +35,8 @@ export const ContextMenu: FC<ContextMenuProps> = ({
   const [position, setPosition] = useState({ left: data.x, top: data.y });
 
   // Adjust position to keep menu within viewport bounds
-  useEffect(() => {
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useLayoutEffect(() => {
     if (!menuRef.current) {
       return;
     }
